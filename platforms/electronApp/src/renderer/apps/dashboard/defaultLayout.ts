@@ -1,0 +1,71 @@
+import type { GridLayoutConfig } from '@muralink/types'
+
+export const defaultLayout: GridLayoutConfig = {
+  layoutId: 'dashboard',
+  platform: 'electron',
+  columns: 6,
+  cellSize: 160,
+  gap: 12,
+  cells: [
+    {
+      id: 'clock',
+      moduleId: 'clock',
+      viewSpecId: 'clock',
+      size: '1x1',
+      position: { col: 0, row: 0 },
+    },
+    {
+      id: 'welcome',
+      moduleId: 'welcome',
+      viewSpecId: 'welcome',
+      size: '2x1',
+      position: { col: 1, row: 0 },
+    },
+    {
+      id: 'link-files',
+      moduleId: 'app-link',
+      viewSpecId: 'app-link',
+      size: '1x1',
+      position: { col: 3, row: 0 },
+      instanceId: 'files',
+    },
+    {
+      id: 'link-apps',
+      moduleId: 'app-link',
+      viewSpecId: 'app-link',
+      size: '1x1',
+      position: { col: 4, row: 0 },
+      instanceId: 'apps',
+    },
+    {
+      id: 'link-orchester',
+      moduleId: 'app-link',
+      viewSpecId: 'app-link',
+      size: '1x1',
+      position: { col: 5, row: 0 },
+      instanceId: 'orchester',
+    },
+    {
+      id: 'notes',
+      moduleId: 'notes-placeholder',
+      viewSpecId: 'notes-placeholder',
+      size: '2x2',
+      position: { col: 0, row: 1 },
+    },
+    {
+      id: 'calendar',
+      moduleId: 'calendar-placeholder',
+      viewSpecId: 'calendar-placeholder',
+      size: '2x2',
+      position: { col: 2, row: 1 },
+    },
+    {
+      id: 'link-settings',
+      moduleId: 'app-link',
+      viewSpecId: 'app-link',
+      size: '1x1',
+      position: { col: 4, row: 1 },
+      instanceId: 'settings',
+    },
+  ],
+}

@@ -1,0 +1,23 @@
+# Elio core API for the BikeHunter instance — systemd unit.
+# Mirrors the bikehunter.service / solid_queue.service pattern already on the
+# box. Install:
+#   sudo cp elio-orchester.service /etc/systemd/system/
+#   sudo cp elio.env /etc/default/elio        # then edit the token!
+#   sudo systemctl daemon-reload && sudo systemctl enable --now elio-orchester
+
+[Unit]
+Description=Elio core API (bikehunter instance)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/elio
+EnvironmentFile=/etc/default/elio
+ExecStart=/usr/bin/npx tsx platforms/server/src/index.ts
+Restart=always
+RestartSec=5
+# sqlite DB + WAL live under platforms/data/ — include it in backups.
+
+[Install]
+WantedBy=multi-user.target

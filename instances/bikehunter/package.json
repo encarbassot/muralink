@@ -1,0 +1,21 @@
+{
+  "name": "@bikehunter/instance",
+  "version": "0.0.0",
+  "description": "BikeHunter (Panot Mobility) — employee pinboard instance. Composes modules, no business logic.",
+  "type": "module",
+  "main": "./modules.ts",
+  "exports": {
+    ".": "./modules.ts",
+    "./config": "./config.ts",
+    "./theme": "./theme.ts"
+  },
+  "dependencies": {
+    "@muralink/types": "*",
+    "@muralink/module-url": "*",
+    "@muralink/module-notes": "*",
+    "@muralink/module-reminders": "*",
+    "@muralink/module-contacts": "*",
+    "@muralink/module-calendar": "*"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@muralink/embed",
+  "version": "0.1.0",
+  "description": "Drop-in React package: recursive dashboard grid, embedded notes editor, contacts and calendar — local-first, works offline, zero backend. The single import surface for embedding Elio into any app.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build --config vite.lib.config.ts",
+    "host:dev": "vite --config host/vite.config.ts",
+    "host:build": "vite build --config host/vite.config.ts"
+  },
+  "dependencies": {
+    "@muralink/module-calendar": "^0.1.0",
+    "@muralink/module-contacts": "^0.1.0",
+    "@muralink/module-notes": "^0.1.0",
+    "@muralink/module-reminders": "^0.1.0",
+    "@muralink/shell": "^0.1.0",
+    "@muralink/spaces": "^0.1.0",
+    "@muralink/types": "^0.1.0",
+    "@muralink/ui": "^0.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.6",
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT"
+}

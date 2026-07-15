@@ -1,0 +1,41 @@
+/* Design tokens — mirrored from platforms/web so the desktop app shares the
+   same surfaces/colors. Single source of truth for sizes and colors. */
+
+:root {
+  /* surfaces */
+  --bg: #0b0d10;
+  --bg-bar: #111418;
+  --bg-panel: #14181d;
+  --bg-elevated: #1b2026;
+  --border: #262c34;
+  --border-strong: #333b45;
+
+  /* text */
+  --fg: #e6e9ee;
+  --fg-dim: #9aa4b2;
+  --fg-faint: #5c6675;
+  --accent: #4c9fff;
+  --accent-dim: #2d5a8a;
+
+  /* explorer */
+  --col-w: 240px; /* one Miller column */
+  --row-h: 26px; /* one dir entry */
+  --topbar-h: 38px;
+
+  /* bento grid */
+  --bento-gap: 6px;
+  --bento-radius: 10px;
+  --bento-padding: 6px;
+
+  /* misc */
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+
+  /* shared with @muralink/ui components */
+  --muted: #1b2026;
+  --muted-fg: #9aa4b2;
+  --shell-gap: 8px;
+  --sidebar-width: 44px;
+  --capsule-radius: 12px;
+}

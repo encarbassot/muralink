@@ -1,0 +1,18 @@
+{
+  "name": "@muralink/core",
+  "version": "0.0.0",
+  "description": "Module runtime contracts: ModuleRegistry, dependency graph, ViewRenderer.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@muralink/types": "*"
+  },
+  "license": "MIT"
+}

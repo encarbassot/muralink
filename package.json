@@ -1,0 +1,25 @@
+{
+  "name": "muralink-platform",
+  "version": "0.0.0",
+  "description": "A local-first, open source, multi-device platform where users install modules to build their own tools.",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "modules/*",
+    "platforms/*",
+    "instances/*"
+  ],
+  "scripts": {
+    "start": "tsx scripts/elio.mjs",
+    "orchester": "npm -w @muralink/orchester run dev",
+    "typecheck": "tsc --build packages/types packages/core"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^33.4.11"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0"
+  }
+}

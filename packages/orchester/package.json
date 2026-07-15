@@ -1,0 +1,35 @@
+{
+  "name": "@muralink/orchester",
+  "version": "0.0.0",
+  "description": "Headless service orchester for an elio instance. CLI is the master; Electron connects via a unix-socket adapter.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./frontend-server": "./src/frontend-server.ts"
+  },
+  "bin": {
+    "orchester": "./bin/orchester.mjs",
+    "orchesterd": "./bin/orchesterd.mjs"
+  },
+  "scripts": {
+    "daemon": "tsx src/daemon-main.ts",
+    "dev": "tsx src/cli/index.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@muralink/types": "*",
+    "ink": "^6.2.0",
+    "react": "^19.1.1",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.13",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.venv/
+
+# Build output (consumers build from src; dist is regenerated)
+dist/
+*.tsbuildinfo
+
+# Local runtime data — sqlite DBs + WAL hold real user content, never commit
+data/
+platforms/data/
+tunnel/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Tooling / editor cruft
+.DS_Store
+graphify-out/
+.graphify_*
+*.log
+
+# Local env (real tokens); templates like *.env under deploy/ are kept
+.env
+.env.local

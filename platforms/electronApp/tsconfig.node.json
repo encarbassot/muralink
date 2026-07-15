@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@muralink/types": ["../../packages/types/src/index.ts"]
+    }
+  },
+  "include": ["src/main", "src/preload", "electron.vite.config.ts"]
+}

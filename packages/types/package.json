@@ -1,0 +1,19 @@
+{
+  "name": "@muralink/types",
+  "version": "0.1.0",
+  "description": "Zero-dependency primitive types and module contracts. The interoperability atoms.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT"
+}

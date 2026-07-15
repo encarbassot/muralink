@@ -1,0 +1,62 @@
+/* Design tokens — the only place sizes/colors are defined. The OS shell and
+   bento grid read these vars; module views read the --sync-* colors via the
+   platform stylesheet. Sentence-case, minimal, every pixel earns its place. */
+
+:root {
+  /* OS shell bar sizes (desktop defaults) */
+  --bar-top-h: 36px;
+  --bar-bottom-h: 28px;
+  --bar-left-w: 220px;
+  --bar-right-w: 240px;
+
+  /* bento grid */
+  --cell: 96px; /* one 1x1 cell, px */
+  --cell-gap: 12px;
+  --grid-cols: 12;
+
+  /* surfaces */
+  --bg: #0b0d10;
+  --bg-bar: #111418;
+  --bg-panel: #14181d;
+  --bg-elevated: #1b2026;
+  --border: #262c34;
+  --border-strong: #333b45;
+
+  /* text */
+  --fg: #e6e9ee;
+  --fg-dim: #9aa4b2;
+  --fg-faint: #5c6675;
+  --accent: #4c9fff;
+  --accent-dim: #2d5a8a;
+
+  /* shadcn-style aliases — module components (contacts, calendar, stock…) read
+     these names. Mapped to our dark tokens so vendored views inherit the theme. */
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --muted: var(--bg-elevated);
+  --muted-foreground: var(--fg-dim);
+  --primary: var(--accent);
+
+  /* the 5 sync states — single source of truth for badges + legend */
+  --sync-local-only: #8b93a1; /* grey: only here, unpublished */
+  --sync-waiting-to-upload: #e0a73a; /* amber: queued to publish */
+  --sync-external: #46b67c; /* green: published / external copy exists */
+  --sync-external-blocked: #d2554e; /* red: needs user confirmation */
+  --sync-awaiting-verification: #7a6ad8; /* violet: version uncertain */
+
+  /* misc */
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* mobile shell overrides — sidebars collapse, bars get taller for touch */
+@media (max-width: 720px) {
+  :root {
+    --bar-top-h: 44px;
+    --bar-bottom-h: 52px;
+    --bar-left-w: 0px;
+    --bar-right-w: 0px;
+    --cell: 84px;
+  }
+}

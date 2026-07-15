@@ -1,0 +1,7 @@
+{
+  "name": "@muralink/text",
+  "version": "0.0.0",
+  "description": "Text editor module with VS Code-style features",
+  "type": "module",
+  "private": true
+}

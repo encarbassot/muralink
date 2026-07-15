@@ -1,0 +1,17 @@
+{
+  "name": "@muralink/module-stock",
+  "version": "0.0.0",
+  "description": "stock — inventory and product tracking.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./web": "./implementations/web/index.ts",
+    "./server": "./implementations/server/index.ts"
+  },
+  "dependencies": {
+    "@muralink/types": "*"
+  },
+  "license": "MIT"
+}

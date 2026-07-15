@@ -1,0 +1,25 @@
+{
+  "name": "@muralink/module-url",
+  "version": "0.1.0",
+  "description": "url — the canonical type module. A web address that knows its parts.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./core": "./core.ts",
+    "./types": "./types.ts"
+  },
+  "files": [
+    "manifest.ts",
+    "types.ts",
+    "implementations",
+    "README.md"
+  ],
+  "dependencies": {
+    "@muralink/types": "^0.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "license": "MIT"
+}

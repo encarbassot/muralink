@@ -1,0 +1,17 @@
+{
+  "name": "@muralink/module-employees",
+  "version": "0.0.0",
+  "description": "employees — staff roster and shift scheduling for service businesses.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./web": "./implementations/web/index.ts",
+    "./server": "./implementations/server/index.ts"
+  },
+  "dependencies": {
+    "@muralink/types": "*"
+  },
+  "license": "MIT"
+}

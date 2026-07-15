@@ -1,0 +1,417 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   mural.ink — Markdown Editor Decoration Styles
+
+   This is the ONLY file you need to edit to change how markdown looks.
+   Each block maps to one markdown element. Class structure:
+
+     .mde-{token}         — the decorated content  (bold text, heading, etc.)
+     .mde-syn             — any syntax marker       (**, ##, >, backtick…)
+     .mde-syn-{token}     — extra size/style for a specific marker type
+     .mde-syn-reveal      — added when cursor is inside the range (always shows)
+
+   Syntax visibility (hidden / muted / visible) is driven by the
+   data-syn="…" attribute on the editor container. Only the three rules
+   under "Syntax visibility modes" need changing to affect all markers.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+
+/* ─── Headings ─────────────────────────────────────────────────────────────
+   # H1   ## H2   ### H3   #### H4
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-h1 { font-size: 1.75rem; font-weight: 600; color: #f8fafc; line-height: 1.3; }
+.mde-h2 { font-size: 1.4rem;  font-weight: 600; color: #f1f5f9; line-height: 1.35; }
+.mde-h3 { font-size: 1.2rem;  font-weight: 600; color: #e2e8f0; line-height: 1.4; }
+.mde-h4 { font-size: 1rem;    font-weight: 600; color: #cbd5e1; }
+
+/* Heading syntax markers (the # chars) match the heading's font size */
+.mde-syn-h1 { font-size: 1.75rem; font-weight: 600; }
+.mde-syn-h2 { font-size: 1.4rem;  font-weight: 600; }
+.mde-syn-h3 { font-size: 1.2rem;  font-weight: 600; }
+.mde-syn-h4 { font-size: 1rem;    font-weight: 600; }
+
+
+/* ─── Bold ─────────────────────────────────────────────────────────────────
+   **bold**  or  __bold__
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-bold { color: #5dcaa5; font-weight: 700; }
+
+
+/* ─── Italic ───────────────────────────────────────────────────────────────
+   *italic*  or  _italic_
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-italic { color: #ef9f27; font-style: italic; }
+
+
+/* ─── Inline code ──────────────────────────────────────────────────────────
+   `code`
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-code {
+  color: #7f77dd;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, 'Courier New', monospace;
+  font-size: 0.9em;
+  background: rgba(127, 119, 221, 0.12);
+  border-radius: 3px;
+  padding: 0.05em 0.35em;
+}
+
+
+/* ─── Links ────────────────────────────────────────────────────────────────
+   [text](url)
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-link {
+  color: #378add;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(55, 138, 221, 0.4);
+}
+
+/* When replacement widget renders an anchor, ensure it's styled like links
+    and is non-editable. */
+.mde-link[contenteditable="false"] { cursor: pointer; }
+
+/* The ](url) section — hidden by default, revealed when cursor is inside */
+.mde-url-hidden  { font-size: 0; opacity: 0; display: inline-block; overflow: hidden; }
+.mde-url-visible { color: #475569; font-size: 0.9em; opacity: 0.75; }
+
+
+/* ─── Blockquote ───────────────────────────────────────────────────────────
+   > quoted text
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-bq { color: #94a3b8; font-style: italic; }
+
+
+/* ─── Syntax markers ───────────────────────────────────────────────────────
+   All syntax characters share class  .mde-syn  so visibility is controlled
+   from ONE place using the data-syn attribute on the container element.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Base colour (applies in all modes) */
+/* Base colour for all syntax markers */
+.mde-syn { color: #64748b; opacity: 0.5; }
+
+/* pretty mode — hide all syntax markers by default unless cursor is inside */
+[data-rich="false"] .mde-syn:not(.mde-syn-reveal) {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  display: inline-block !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+}
+
+/* pretty mode — marker is hidden by default */
+.mde-syn.mde-syn-pretty {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  display: inline-block !important;
+  opacity: 0 !important;
+}
+
+/* reveal — cursor is on this line; always show, overrides mde-syn-pretty */
+.mde-syn.mde-syn-reveal {
+  font-size: inherit !important;
+  line-height: inherit !important;
+  width: auto        !important;
+  overflow: visible  !important;
+  display: inline    !important;
+  opacity: 1         !important;
+}
+
+
+/* ─── Bullet widget ────────────────────────────────────────────────────────
+   Replaces the  -  list marker in pretty mode with a styled dot
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-bullet {
+  color: #64748b;
+  margin-right: 3px;
+  user-select: none;
+  cursor: default;
+}
+
+/* Toggle which bullet glyph is shown depending on editor mode.
+    The MarkdownEditor sets `data-rich="true|false"` on the editor container.
+    - data-rich="true": show raw marker (e.g. `-`)
+    - data-rich="false": show pretty dot (●)
+*/
+[data-rich="true"] .mde-bullet-dot  { display: none; }
+[data-rich="true"] .mde-bullet-raw  { display: inline; }
+[data-rich="false"] .mde-bullet-dot { display: inline; }
+[data-rich="false"] .mde-bullet-raw { display: none; }
+
+
+/* ─── Horizontal rule widget ───────────────────────────────────────────────
+   ---  or  ***  or  ___
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-hr {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: rgba(100, 116, 139, 0.35);
+  margin: 6px 0;
+}
+
+
+/* ─── Image widget ─────────────────────────────────────────────────────────
+   ![alt](src)
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-image             { max-width: 100%; border-radius: 6px; display: block; margin: 4px 0; }
+.mde-image-placeholder { opacity: 0.4; }
+/* Pretty caption shown inside the widget (non-editable) */
+.mde-image-caption {
+  display: block;
+  color: #64748b;
+  font-size: 0.85em;
+  margin-top: 2px;
+}
+
+/* ─── Image raw text (the actual editable `![alt](src)` in the document) ─────────
+   The raw markdown sits in the DOM at all times (never replaced).
+   By default it is invisible so the pretty widget is shown cleanly.
+   CSS reveals it when the line is hovered / selected / in rich mode,
+   allowing the user to click into it and edit the text directly.
+   ─────────────────────────────────────────────────────────────────────── */
+.mde-image-raw-text {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  user-select: none !important;
+  opacity: 0 !important;
+  display: inline-block !important;
+  overflow: hidden !important;
+  color: transparent !important;
+}
+
+/* Reveal raw text in rich mode — hide pretty caption to avoid duplication */
+[data-rich="true"] .mde-image-raw-text {
+  font-size: inherit !important;
+  line-height: inherit !important;
+  user-select: text !important;
+  opacity: 1 !important;
+  display: block !important;
+  overflow: visible !important;
+  color: #64748b !important;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, 'Courier New', monospace;
+}
+[data-rich="true"] .mde-image-caption { display: none !important; }
+
+/* Reveal raw text on hover or selection — this is what makes it editable */
+.cm-line.mde-line-hover .mde-image-raw-text,
+.cm-line.mde-line-selected .mde-image-raw-text {
+  font-size: inherit !important;
+  line-height: inherit !important;
+  user-select: text !important;
+  opacity: 1 !important;
+  display: block !important;
+  overflow: visible !important;
+  color: #64748b !important;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, 'Courier New', monospace;
+}
+/* Hide pretty caption when the raw text is shown (avoid duplication) */
+.cm-line.mde-line-hover .mde-image-caption,
+.cm-line.mde-line-selected .mde-image-caption { display: none !important; }
+
+/* ─── Reveal on hover / selection ───────────────────────────────────────── */
+/* When hovering any .cm-line or selecting it, show ALL syntax markers for that
+   line — headings, bold, italic, code, quote, list markers. This makes every
+   markdown element behave like a title: clean by default, raw syntax on hover
+   or when the caret is inside. The [data-rich="false"] prefix bumps specificity
+   above the pretty-mode hide rule regardless of source order. */
+[data-rich="false"] .cm-line.mde-line-hover .mde-syn,
+[data-rich="false"] .cm-line.mde-line-selected .mde-syn,
+.cm-line.mde-line-hover .mde-syn.mde-syn-pretty,
+.cm-line.mde-line-selected .mde-syn.mde-syn-pretty {
+   font-size: inherit !important;
+   line-height: inherit !important;
+   width: auto !important;
+   overflow: visible !important;
+   display: inline !important;
+   opacity: 1 !important;
+}
+
+/* ─── List "+ new" button ───────────────────────────────────────────────────
+   Rendered below the last item of a list when the caret is anywhere in it.
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-list-add {
+  user-select: none;
+  padding: 1px 0 2px;
+}
+.mde-list-add-btn {
+  appearance: none;
+  border: 1px dashed rgba(100, 116, 139, 0.35);
+  background: transparent;
+  color: #64748b;
+  border-radius: 5px;
+  padding: 1px 8px;
+  font-size: 0.8em;
+  line-height: 1.4;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.12s, color 0.12s, border-color 0.12s, background 0.12s;
+}
+.mde-list-add-btn:hover {
+  opacity: 1;
+  color: #cbd5e1;
+  border-color: rgba(100, 116, 139, 0.6);
+  background: rgba(100, 116, 139, 0.12);
+}
+[data-postit] .mde-list-add-btn { color: #78716c; border-color: rgba(0,0,0,0.25); }
+[data-postit] .mde-list-add-btn:hover { color: #1c1917; background: rgba(0,0,0,0.06); }
+
+/* Bullet widget: show raw marker on hover/selection (override data-rich) */
+.cm-line.mde-line-hover .mde-bullet-dot,
+.cm-line.mde-line-selected .mde-bullet-dot { display: none !important; }
+.cm-line.mde-line-hover .mde-bullet-raw,
+.cm-line.mde-line-selected .mde-bullet-raw { display: inline !important; }
+
+/* Link widget: include raw markdown after the anchor; show on hover/selection */
+.mde-link-raw { display: none; color: #64748b; font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, 'Courier New', monospace; margin-left: 6px; font-size: 0.9em; }
+.cm-line.mde-line-hover .mde-link-raw,
+.cm-line.mde-line-selected .mde-link-raw { display: inline !important; }
+
+
+
+/* ─── Fenced code blocks ───────────────────────────────────────────────────
+   Line decorations applied per .cm-line make the block look like a single
+   container. First/last lines carry the border-radius; all share the bg/border.
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-codeblock-line {
+  background: rgba(30, 30, 30, 0.6) !important;
+  border-left:  1px solid rgba(100, 116, 139, 0.3) !important;
+  border-right: 1px solid rgba(100, 116, 139, 0.3) !important;
+  padding-left:  16px !important;
+  padding-right: 16px !important;
+  position: relative !important;
+}
+.mde-codeblock-line-first {
+  border-top: 1px solid rgba(100, 116, 139, 0.3) !important;
+  border-top-left-radius:  8px !important;
+  border-top-right-radius: 8px !important;
+  /* Slim fence line — less vertical padding, smaller text */
+  padding-top:    4px !important;
+  padding-bottom: 4px !important;
+  font-size: 0.78em !important;
+  color: #64748b !important;
+}
+.mde-codeblock-line-last {
+  border-bottom: 1px solid rgba(100, 116, 139, 0.3) !important;
+  border-bottom-left-radius:  8px !important;
+  border-bottom-right-radius: 8px !important;
+  padding-top:    4px !important;
+  padding-bottom: 4px !important;
+  font-size: 0.78em !important;
+  color: #64748b !important;
+}
+
+/* Copy button — absolutely positioned to the right of the fence line */
+.mde-codeblock-copy {
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 3px 5px !important;
+  background: rgba(100, 116, 139, 0.15) !important;
+  border: 1px solid rgba(100, 116, 139, 0.25) !important;
+  border-radius: 4px !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s, color 0.15s !important;
+  line-height: 1 !important;
+  font-size: 1rem !important; /* reset from fence line 0.78em */
+  user-select: none !important;
+}
+/* Show copy button when ANY line of the block is hovered */
+.mde-codeblock-line-first.mde-codeblock-hover .mde-codeblock-copy,
+.mde-codeblock-line-last.mde-codeblock-hover  .mde-codeblock-copy {
+  opacity: 1 !important;
+}
+.mde-codeblock-copy:hover {
+  color: #cbd5e1 !important;
+  background: rgba(100, 116, 139, 0.3) !important;
+}
+.mde-codeblock-copy-done {
+  color: #4ade80 !important;
+  border-color: rgba(74, 222, 128, 0.4) !important;
+  opacity: 1 !important;
+}
+
+/* ─── Unpaired fenced code blocks (error state) ─────────────────────────── */
+.mde-codeblock-error-marker {
+  color: rgba(220, 38, 38, 0.95) !important;
+  background: rgba(220, 38, 38, 0.15) !important;
+  text-decoration: underline wavy rgba(220, 38, 38, 0.85) !important;
+  font-weight: 600 !important;
+}
+
+/* ─── Post-it mode text overrides ──────────────────────────────────────────
+   Applied via data-postit="color" on the container wrapping MarkdownEditor.
+   Light background requires dark text for all tokens.
+   ────────────────────────────────────────────────────────────────────────── */
+[data-postit] .cm-editor  { background: transparent !important; }
+[data-postit] .cm-scroller { background: transparent !important; }
+[data-postit] .cm-content  { color: #1c1917 !important; caret-color: #1c1917 !important; }
+[data-postit] .cm-cursor   { border-left-color: #1c1917 !important; }
+[data-postit] .cm-selectionBackground { background: rgba(0,0,0,0.18) !important; }
+[data-postit] .cm-activeLine { background: rgba(0,0,0,0.05) !important; }
+[data-postit] .cm-placeholder { color: #a8a29e !important; }
+/* Headings */
+[data-postit] .mde-h1 { color: #1c1917 !important; }
+[data-postit] .mde-h2 { color: #292524 !important; }
+[data-postit] .mde-h3 { color: #44403c !important; }
+[data-postit] .mde-h4 { color: #57534e !important; }
+/* Inline styles */
+[data-postit] .mde-bold   { color: #5b21b6 !important; }
+[data-postit] .mde-italic { color: #b45309 !important; }
+[data-postit] .mde-code   { color: #4f46e5 !important; background: rgba(79,70,229,0.1) !important; }
+[data-postit] .mde-bq     { color: #57534e !important; }
+[data-postit] .mde-link   { color: #1d4ed8 !important; }
+/* Syntax markers */
+[data-postit] .mde-syn         { color: #a8a29e !important; opacity: 1 !important; }
+[data-postit] .mde-syn-h1      { font-size: 1.75rem !important; }
+[data-postit] .mde-syn-h2      { font-size: 1.4rem  !important; }
+[data-postit] .mde-syn-h3      { font-size: 1.2rem  !important; }
+[data-postit] .mde-bullet-dot  { color: #78716c !important; }
+/* Code block */
+[data-postit] .mde-codeblock-line { background: rgba(0,0,0,0.07) !important; border-color: rgba(0,0,0,0.15) !important; }
+
+
+/* ─── Checkbox widget ──────────────────────────────────────────────────────
+   - [ ] unchecked   - [x] checked
+   ────────────────────────────────────────────────────────────────────────── */
+.mde-checkbox {
+  width: 0.85em;
+  height: 0.85em;
+  accent-color: var(--accent, #6366f1);
+  cursor: pointer;
+  vertical-align: middle;
+  margin-right: 0.35em;
+  position: relative;
+  top: -0.05em;
+}
+
+
+/* ─── Context menu for code block dock ----------------------------------- */
+.mde-codeblock-contextmenu {
+  position: fixed;
+  z-index: 99999;
+  background: #0b1220;
+  border: 1px solid rgba(100,116,139,0.2);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+  color: #cbd5e1;
+  padding: 6px 6px;
+  border-radius: 6px;
+  min-width: 160px;
+  font-size: 13px;
+}
+.mde-codeblock-contextmenu-item {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.mde-codeblock-contextmenu-item:hover {
+  background: rgba(100,116,139,0.14);
+  color: #f8fafc;
+}

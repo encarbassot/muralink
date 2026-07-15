@@ -1,0 +1,42 @@
+{
+  "name": "@muralink/platform-electron",
+  "version": "0.0.0",
+  "description": "Local-first macOS desktop file explorer. Finder-style Miller columns + preview. The first platform runtime that touches the real filesystem.",
+  "private": true,
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@muralink/types": "*",
+    "@muralink/app": "*",
+    "@muralink/orchester": "*",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "node-pty": "^1.1.0",
+    "playwright-core": "^1.61.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^33.2.0",
+    "electron-vite": "^5.0.0",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.6"
+  },
+  "license": "MIT"
+}

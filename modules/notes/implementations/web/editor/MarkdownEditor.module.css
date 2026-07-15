@@ -1,0 +1,59 @@
+/* ──────────────────────────────────────────────────────────────────
+   MarkdownEditor — CodeMirror 6 container & chrome styles only.
+   Markdown decoration styles live in  editor.css  (plain CSS, easy to edit).
+   ────────────────────────────────────────────────────────────────── */
+
+/* ── Host container ──────────────────────────────────────────────── */
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor :global(.cm-editor) {
+  height: 100%;
+  background: transparent;
+  outline: none !important;
+}
+
+.editor :global(.cm-scroller) {
+  overflow: auto;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--fg);
+}
+
+.editor :global(.cm-content) {
+  padding: 0;
+  caret-color: var(--accent);
+}
+
+.editor :global(.cm-cursor) {
+  border-left-color: var(--accent);
+  border-left-width: 2px;
+}
+
+.editor :global(.cm-selectionBackground) {
+  background: color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+
+.editor :global(.cm-focused .cm-selectionBackground) {
+  background: color-mix(in srgb, var(--accent) 24%, transparent) !important;
+}
+
+.editor :global(.cm-gutters) {
+  display: none;
+}
+
+.editor :global(.cm-activeLine) {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+  border-radius: 2px;
+}
+
+.editor :global(.cm-placeholder) {
+  color: var(--fg-faint);
+  font-style: italic;
+}

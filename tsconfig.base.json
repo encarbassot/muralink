@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@muralink/types": ["./packages/types/src/index.ts"],
+      "@muralink/app": ["./packages/app/src/index.ts"],
+      "@muralink/core": ["./packages/core/src/index.ts"],
+      "@muralink/ui": ["./packages/ui/src/index.ts"],
+      "@muralink/shell": ["./packages/shell/src/index.ts"],
+      "@muralink/spaces": ["./packages/spaces/src/index.ts"],
+      "@muralink/embed": ["./packages/embed/src/index.ts"],
+      "@hair-saloon/*": ["./instances/hair-saloon/*"]
+    },
+    "baseUrl": "."
+  }
+}

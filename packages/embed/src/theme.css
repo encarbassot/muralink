@@ -1,0 +1,69 @@
+/* Self-contained design tokens for @muralink/embed. Scoped to .mural-root so an
+   embedding host's own :root vars are never touched. Every module view
+   (notes, contacts, calendar) reads these names, so wrapping content in
+   <MuralProvider> (which applies .mural-root) is enough to render themed with
+   no external stylesheet. Dark by default; add data-mural-theme="light". */
+
+.mural-root {
+  /* bento grid */
+  --cell: 96px;
+  --cell-gap: 12px;
+  --grid-cols: 12;
+
+  /* surfaces */
+  --bg: #0b0d10;
+  --bg-bar: #111418;
+  --bg-panel: #14181d;
+  --bg-elevated: #1b2026;
+  --border: #262c34;
+  --border-strong: #333b45;
+
+  /* text */
+  --fg: #e6e9ee;
+  --fg-dim: #9aa4b2;
+  --fg-faint: #5c6675;
+  --accent: #4c9fff;
+  --accent-dim: #2d5a8a;
+
+  /* shadcn-style aliases some views read */
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --muted: var(--bg-elevated);
+  --muted-foreground: var(--fg-dim);
+  --primary: var(--accent);
+
+  /* misc */
+  --radius: 8px;
+  --radius-sm: 5px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+
+  color: var(--fg);
+  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.mural-root *,
+.mural-root *::before,
+.mural-root *::after {
+  box-sizing: border-box;
+}
+
+/* Light theme override — opt in with data-mural-theme="light" on .mural-root */
+.mural-root[data-mural-theme='light'] {
+  --bg: #f9f7f4;
+  --bg-bar: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-elevated: #ffffff;
+  --border: #e2ddd6;
+  --border-strong: #cfc8bf;
+
+  --fg: #1f2937;
+  --fg-dim: #5b6472;
+  --fg-faint: #9aa2ae;
+  --accent: #2563eb;
+  --accent-dim: #93b4f0;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@muralink/module-inventory",
+  "version": "0.0.0",
+  "description": "inventory — item stock tracking with movement history and low-stock alerts.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./web": "./implementations/web/index.ts",
+    "./server": "./implementations/server/index.ts"
+  },
+  "dependencies": {
+    "@muralink/types": "*"
+  },
+  "license": "MIT"
+}

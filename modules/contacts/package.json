@@ -1,0 +1,41 @@
+{
+  "name": "@muralink/module-contacts",
+  "version": "0.1.0",
+  "description": "contacts — clients, basic info, and visit history.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./web": "./implementations/web/index.ts",
+    "./server": "./implementations/server/index.ts",
+    "./adapter": "./adapter.ts"
+  },
+  "files": [
+    "manifest.ts",
+    "types.ts",
+    "adapter.ts",
+    "implementations",
+    "README.md"
+  ],
+  "dependencies": {
+    "@muralink/module-url": "^0.1.0",
+    "@muralink/spaces": "^0.1.0",
+    "@muralink/types": "^0.1.0",
+    "zustand": "^5.0.8"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "express": ">=4",
+    "better-sqlite3": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,112 @@
+/* Styles for module-emitted class names. Modules ship unstyled, semantically
+   class-named markup (e.g. `url-card`, `notes-card`); the platform owns the
+   look. Add a block here when you register a new module's views. */
+
+/* shared card surface every module view sits on */
+.url-card,
+.notes-card,
+.calculator-pad,
+.clock-face {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  flex-direction: column;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  padding: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+/* url */
+.url-card {
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+}
+.url-card__domain {
+  font-weight: 600;
+  word-break: break-all;
+}
+.url-card--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-faint);
+}
+
+/* notes */
+.notes-card__area {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+}
+.notes-card__area::placeholder {
+  color: var(--fg-faint);
+}
+.notes-card__meta {
+  margin-top: 6px;
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+
+/* calculator */
+.calculator-pad__display {
+  min-height: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  word-break: break-all;
+}
+.calculator-pad__keys {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 6px;
+}
+.calculator-pad__keys button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--fg);
+}
+.calculator-pad__keys button:active {
+  background: var(--accent-dim);
+}
+
+/* clock */
+.clock-face {
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.clock-face__time {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.clock-face__date {
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+/* placeholder when a view component is missing or a size is unsupported */
+.view-fallback {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--fg-faint);
+  font-size: 11px;
+  text-align: center;
+  padding: 8px;
+}

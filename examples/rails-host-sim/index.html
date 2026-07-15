@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BikeHunter host sim — Elio pinboard</title>
+    <!-- Simulates the Rails layout: Devise user + instance token injected as
+         meta tags, exactly like app/views/shared/_pinboard.html.erb does. -->
+    <meta name="pinboard-user" content='{"id":"emp-1","name":"Eloi","role":"admin","color":"#16a34a"}' />
+    <meta name="elio-token" content="dev-token" />
+    <style>
+      /* Tailwind-preflight-like reset, to prove .elio-root style isolation */
+      *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; }
+      html { line-height: 1.5; -webkit-text-size-adjust: 100%; font-family: ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; line-height: inherit; }
+      h1, h2, p { margin: 0; }
+      button, input, select, textarea { font-family: inherit; font-size: 100%; line-height: inherit; color: inherit; margin: 0; padding: 0; }
+      button { background-color: transparent; background-image: none; cursor: pointer; }
+      input::placeholder, textarea::placeholder { opacity: 1; color: #9ca3af; }
+
+      /* Fake back-office chrome */
+      .bh-nav { background: #111827; color: #fff; padding: 12px 20px; display: flex; gap: 16px; align-items: center; }
+      .bh-main { padding: 24px; }
+      .bh-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; max-width: 640px; margin-bottom: 12px; }
+
+      /* Drawer overlay (their Pinboard pattern) */
+      .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 92vw); background: #fff; box-shadow: -12px 0 40px rgba(0,0,0,.25); transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; z-index: 50; }
+      .drawer.open { transform: translateX(0); }
+      .drawer-body { flex: 1; min-height: 0; }
+      .pad { position: fixed; right: 0; top: 40%; background: #16a34a; color: #fff; padding: 10px 8px; border-radius: 8px 0 0 8px; z-index: 51; }
+    </style>
+  </head>
+  <body>
+    <nav class="bh-nav"><strong>BikeHunter</strong> <span>Clientes</span> <span>Bicis</span> <span>Pedidos</span></nav>
+    <main class="bh-main">
+      <div class="bh-card"><h2>Página del back office</h2><p>Contenido Hotwire de mentira. El botón «Turbo visit» desmonta y re-monta el DOM para probar el mount idempotente.</p></div>
+      <button id="turbo-visit" style="border:1px solid #d1d5db;border-radius:8px;padding:8px 14px">⟳ Turbo visit (remount)</button>
+    </main>
+
+    <button class="pad" id="pad">📌</button>
+    <div class="drawer" id="drawer">
+      <div class="drawer-body">
+        <div id="elio-pinboard-root" style="height:100%"></div>
+      </div>
+    </div>
+
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

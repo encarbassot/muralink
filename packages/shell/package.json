@@ -1,0 +1,19 @@
+{
+  "name": "@muralink/shell",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "dependencies": {
+    "@muralink/ui": "^0.1.0",
+    "@muralink/types": "^0.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "license": "MIT",
+  "private": true
+}

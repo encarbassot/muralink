@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "ignoreDeprecations": "5.0",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@muralink/types": ["../../packages/types/src/index.ts"],
+      "@muralink/ui": ["../../packages/ui/src/index.ts"],
+      "@muralink/shell": ["../../packages/shell/src/index.ts"],
+      "@/*": ["./src/renderer/*"]
+    }
+  },
+  "include": ["src/renderer", "src/preload"],
+  "exclude": ["src/main"]
+}

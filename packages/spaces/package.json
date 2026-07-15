@@ -1,0 +1,22 @@
+{
+  "name": "@muralink/spaces",
+  "version": "0.1.0",
+  "description": "Storage spaces — every item lives in exactly one space (local device, company server, cloud backup). Registry, IndexedDB and HTTP space factories, and merge/prefs helpers shared by all local-first module stores.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "idb": "^8.0.3"
+  },
+  "license": "MIT"
+}

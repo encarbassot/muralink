@@ -1,0 +1,50 @@
+{
+  "name": "@muralink/app",
+  "version": "0.0.0",
+  "description": "The single shared React app. Platforms (web, electron) mount <App env={...}/> and inject their environment.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tunnel": "./src/TunnelApp.tsx",
+    "./tunnel-dashboard": "./src/TunnelDashboard.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.6.0",
+    "@codemirror/lang-markdown": "^6.3.0",
+    "@codemirror/language": "^6.10.2",
+    "@codemirror/search": "^6.5.6",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.28.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@muralink/core": "*",
+    "@muralink/shell": "*",
+    "@muralink/ui": "*",
+    "@muralink/types": "*",
+    "@muralink/module-url": "*",
+    "@muralink/module-calendar": "*",
+    "@muralink/module-contacts": "*",
+    "@muralink/module-appointments": "*",
+    "@muralink/module-stock": "*",
+    "@muralink/module-notes": "*",
+    "@lezer/common": "^1.2.1",
+    "@tanstack/react-query": "^5.51.1",
+    "axios": "^1.7.2",
+    "idb": "^8.0.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^6.24.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "typescript": "^5.9.2"
+  },
+  "license": "MIT"
+}
