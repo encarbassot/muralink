@@ -45,9 +45,9 @@ const pkg={
   files:["dist","README.md","LICENSE"], sideEffects:["*.css"],
   peerDependencies:{react:">=18","react-dom":">=18"},
   keywords:["muralink","dashboard","bento","notes","calendar","local-first","react","embed"],
-  homepage:"https://github.com/encarbassot/mural.ink#readme",
-  repository:{type:"git",url:"git+https://github.com/encarbassot/mural.ink.git"},
-  bugs:{url:"https://github.com/encarbassot/mural.ink/issues"}, license:"MIT"
+  homepage:"https://github.com/encarbassot/muralink#readme",
+  repository:{type:"git",url:"git+https://github.com/encarbassot/muralink.git"},
+  bugs:{url:"https://github.com/encarbassot/muralink/issues"}, license:"MIT"
 };
 fs.writeFileSync(S+"/package.json",JSON.stringify(pkg,null,2)+"\n");
 ' "$STAGE" "$VER"
