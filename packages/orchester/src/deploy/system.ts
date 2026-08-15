@@ -142,13 +142,25 @@ export function installCmd(family: HostInfo['family'], packages: string[]): { cm
 }
 
 // True when nothing is listening on `port` (we can bind it ourselves).
-export function portFree(port: number, host = '0.0.0.0'): Promise<boolean> {
-  return new Promise((resolve) => {
+export async function portFree(port: number, host = '0.0.0.0'): Promise<boolean> {
+  const bind = await new Promise<'free' | 'in-use' | 'denied'>((resolve) => {
     const srv = createServer()
-    srv.once('error', () => resolve(false))
-    srv.once('listening', () => srv.close(() => resolve(true)))
+    srv.once('error', (err: NodeJS.ErrnoException) => {
+      resolve(err.code === 'EACCES' ? 'denied' : 'in-use')
+    })
+    srv.once('listening', () => srv.close(() => resolve('free')))
     srv.listen(port, host)
   })
+
+  if (bind !== 'denied') return bind === 'free'
+
+  // EACCES is not EADDRINUSE. Ports below 1024 need privileges and the wizard
+  // runs unprivileged, so a failed bind on :80 says nothing about whether
+  // anything holds it — and Linux checks permission first, so an occupied :80
+  // reports EACCES too. Neither answer can come from the bind. Ask the kernel
+  // who is listening instead. The service that will bind it (nginx) runs as
+  // root, so "denied" is never the operator's problem to solve.
+  return (await portHolder(port)) === null
 }
 
 // What is holding a port, when we can tell. Purely informational.

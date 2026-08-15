@@ -303,6 +303,18 @@ const source: DeployStep = {
       return warn('not a git checkout — left untouched')
     }
 
+    // `npm install` rewrites package-lock.json, so every deployed box has a
+    // dirty checkout within minutes of being installed, and would never accept
+    // an update again. The lock is generated: discard the local copy and let
+    // the dependencies step regenerate it. Any *other* local change is left
+    // alone and stops the update — that one is a human's edit, not a tool's.
+    const dirty = await run('git', ['status', '--porcelain'], { cwd: repoRoot })
+    const changed = dirty.stdout.trim().split('\n').filter(Boolean)
+    if (changed.length && changed.every((l) => l.endsWith('package-lock.json'))) {
+      ctx.log('discarding the generated package-lock.json…')
+      await run('git', ['checkout', '--', 'package-lock.json'], { cwd: repoRoot })
+    }
+
     // Fast-forward only. A deploy that silently merges or rebases is a deploy
     // that can ship something nobody wrote.
     ctx.log('git fetch…')
