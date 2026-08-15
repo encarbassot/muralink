@@ -21,7 +21,7 @@ import {
   run, runPrivileged, which,
 } from './system'
 import { randomBytes } from 'node:crypto'
-import { ACME_WEBROOT, applySite, nginxStatus } from './nginx'
+import { ACME_WEBROOT, applySite, nginxStatus, renderSite } from './nginx'
 import { hashPassword } from '../session'
 import {
   acmePaths, certInfo, ensureSelfSigned, installRenewHook, issueAcme,
@@ -642,6 +642,25 @@ const database: DeployStep = {
 
 // ── 11. web server ───────────────────────────────────────────────────────────
 
+// The site nginx should be serving, given the config as it stands right now.
+// Shared by check and apply so the two can never disagree about what "applied"
+// means — the check renders this and diffs it against the file on disk.
+function siteConfigFor(cfg: DeployConfig): Parameters<typeof applySite>[0] {
+  // Certificates are issued in the next step and HTTP-01 needs :80 answering,
+  // so the site starts in plain-HTTP mode. The tls step promotes it.
+  const certs = cfg.tls === 'acme' ? acmePaths(cfg.domain) : selfSignedPaths(cfg.domain)
+  const haveCert = existsSync(certs.certPath) && existsSync(certs.keyPath)
+  return {
+    domain: cfg.domain,
+    aliases: cfg.aliases,
+    upstreamPort: cfg.webPort,
+    mode: cfg.tls !== 'none' && haveCert ? 'https' : 'http',
+    certPath: certs.certPath,
+    keyPath: certs.keyPath,
+    apiToken: cfg.basicAuthUser ? cfg.apiToken : undefined,
+  }
+}
+
 const webserver: DeployStep = {
   id: 'webserver',
   title: 'Web server (nginx)',
@@ -660,6 +679,16 @@ const webserver: DeployStep = {
     if (st.configValid === false) return fail('nginx -t rejects the current config', hints)
     if (!st.running) return fail('nginx is not running', hints)
     if (!cfg.authHash && cfg.basicAuthUser) return todo('site up but the auth gate has no password', hints)
+
+    // Existing is not the same as current. A site file written by an older
+    // version keeps nginx happily serving the previous gate long after the
+    // config says otherwise — and `apply --all` would skip this step forever
+    // because "the site is enabled" was the whole test.
+    const deployed = await runPrivileged('cat', [st.sitePath])
+    if (deployed.ok && deployed.stdout.trim() !== renderSite(siteConfigFor(cfg)).trim()) {
+      return todo('the deployed site differs from what this config renders', hints)
+    }
+
     return ok('site enabled and nginx reloaded', hints)
   },
   async apply(ctx) {
@@ -673,22 +702,9 @@ const webserver: DeployStep = {
       return fail('the login gate has no password yet — apply the service step with MURALINK_AUTH_PASSWORD set')
     }
 
-    // Certificates are issued in the next step and HTTP-01 needs :80 answering,
-    // so the site always starts in plain-HTTP mode. The tls step promotes it.
-    const certs = cfg.tls === 'acme' ? acmePaths(cfg.domain) : selfSignedPaths(cfg.domain)
-    const haveCert = existsSync(certs.certPath) && existsSync(certs.keyPath)
-    const mode = cfg.tls !== 'none' && haveCert ? 'https' : 'http'
-
-    ctx.log(`applying site in ${mode} mode…`)
-    const res = await applySite({
-      domain: cfg.domain,
-      aliases: cfg.aliases,
-      upstreamPort: cfg.webPort,
-      mode,
-      certPath: certs.certPath,
-      keyPath: certs.keyPath,
-      apiToken: cfg.basicAuthUser ? cfg.apiToken : undefined,
-    })
+    const site = siteConfigFor(cfg)
+    ctx.log(`applying site in ${site.mode} mode…`)
+    const res = await applySite(site)
     if (!res.ok) return fail(res.message)
     return ok(res.message, [`ACME webroot ${ACME_WEBROOT}`])
   },
@@ -756,15 +772,10 @@ const tls: DeployStep = {
     if (cfg.webServer === 'nginx') {
       const paths = cfg.tls === 'acme' ? acmePaths(cfg.domain) : selfSignedPaths(cfg.domain)
       ctx.log('promoting the nginx site to HTTPS…')
-      const site = await applySite({
-        domain: cfg.domain,
-        aliases: cfg.aliases,
-        upstreamPort: cfg.webPort,
-        mode: 'https',
-        certPath: paths.certPath,
-        keyPath: paths.keyPath,
-          apiToken: cfg.basicAuthUser ? cfg.apiToken : undefined,
-      })
+      // Same builder the webserver step uses, forced to https now that the
+      // certificate exists. Rendering it any other way here would leave the
+      // webserver check reporting drift against a site this step just wrote.
+      const site = await applySite({ ...siteConfigFor(cfg), mode: 'https', certPath: paths.certPath, keyPath: paths.keyPath })
       if (!site.ok) return fail(site.message)
     }
     return ok('TLS in place')
