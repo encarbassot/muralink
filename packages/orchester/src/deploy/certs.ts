@@ -90,12 +90,21 @@ export interface IssueResult {
   message: string
 }
 
+// Everything under /etc/letsencrypt/live is root-only (drwx------), and this
+// wizard runs unprivileged. `existsSync` on those paths answers "no" for a
+// file that is plainly there, so a certificate certbot just issued gets
+// reported as a failed step. Ask with the same privileges that wrote it.
+async function existsPrivileged(path: string): Promise<boolean> {
+  const res = await runPrivileged('test', ['-f', path])
+  return res.ok
+}
+
 // Generate (or keep) a self-signed pair for `domain`. Idempotent: an existing
 // pair with more than a week of life is reused, so re-running the wizard step
 // does not invalidate the cert every browser on the LAN just accepted.
 export async function ensureSelfSigned(domain: string, altNames: string[] = []): Promise<IssueResult> {
   const pair = selfSignedPaths(domain)
-  if (existsSync(pair.certPath) && existsSync(pair.keyPath)) {
+  if ((await existsPrivileged(pair.certPath)) && (await existsPrivileged(pair.keyPath))) {
     const info = await certInfo(pair.certPath)
     if ((info.daysLeft ?? 0) > 7) {
       return { ok: true, pair, message: `reusing self-signed cert (${info.daysLeft}d left)` }
@@ -136,9 +145,6 @@ export interface AcmeOptions {
   staging?: boolean
 }
 
-// Issue via certbot's webroot plugin. Webroot (not --nginx) on purpose: the
-// nginx plugin rewrites our managed site file behind our back, and this file is
-// the authority on what that site contains.
 // A name a public CA could plausibly issue for: a dotted FQDN that is not an
 // IP address. Deliberately not a validity check — DNS and the challenge decide
 // that. This only filters out the names that make the request fail outright.
@@ -151,6 +157,9 @@ export function isPubliclyCertifiable(name: string): boolean {
   return true
 }
 
+// Issue via certbot's webroot plugin. Webroot (not --nginx) on purpose: the
+// nginx plugin rewrites our managed site file behind our back, and this file is
+// the authority on what that site contains.
 export async function issueAcme(opts: AcmeOptions): Promise<IssueResult> {
   if (!which('certbot')) {
     return { ok: false, pair: null, message: 'certbot is not installed' }
@@ -176,7 +185,7 @@ export async function issueAcme(opts: AcmeOptions): Promise<IssueResult> {
 
   const res = await runPrivileged('certbot', args, { timeoutMs: 180_000 })
   const pair = acmePaths(opts.domain)
-  if (!res.ok || !existsSync(pair.certPath)) {
+  if (!res.ok || !(await existsPrivileged(pair.certPath))) {
     return { ok: false, pair: null, message: `certbot failed:\n${res.stdout}\n${res.stderr}`.trim() }
   }
   return { ok: true, pair, message: `certificate issued for ${opts.domain}` }
