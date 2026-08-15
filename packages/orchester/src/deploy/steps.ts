@@ -7,7 +7,8 @@
 // data, not a screen.
 //
 // Rules every step obeys:
-//   - check() never mutates the host.
+//   - check() never mutates the host. (The source step fetches: it updates
+//     remote-tracking refs only, and cannot answer its question otherwise.)
 //   - apply() is idempotent — running the wizard twice is a supported thing.
 //   - a step that cannot proceed reports 'fail' with the real stderr, never a
 //     summary. The operator is on an SSH session and needs the actual error.
@@ -294,9 +295,25 @@ const source: DeployStep = {
 
     // Behind origin is the whole reason this step has an apply(). `apply --all`
     // skips anything already 'ok', so reporting a stale checkout as ok is what
-    // makes a box silently deploy last month's code — which is exactly what it
-    // did the first time this ran. Cheap and offline: compare against the last
-    // fetched ref, never the network.
+    // makes a box silently deploy last month's code.
+    //
+    // This is the one check that touches the network, because the question it
+    // answers cannot be answered locally: comparing against an unrefreshed
+    // remote ref says the box is current no matter how far behind it is. A
+    // fetch updates remote-tracking refs and nothing else — the working tree,
+    // the services and the host are untouched, so the "check never mutates"
+    // rule still holds. Short timeout, and an unreachable origin is reported
+    // as unknown rather than as a failure: a box with no internet is still a
+    // working instance.
+    const fetched = await run('git', ['fetch', '--quiet', 'origin', repoBranch], {
+      cwd: repoRoot,
+      timeoutMs: 20_000,
+    })
+    if (!fetched.ok) {
+      hints.push('could not reach origin — cannot tell whether this is up to date')
+      return ok('checkout present', hints)
+    }
+
     const behind = await run('git', ['rev-list', '--count', `HEAD..origin/${repoBranch}`], { cwd: repoRoot })
     const count = Number(behind.stdout.trim())
     if (behind.ok && Number.isFinite(count) && count > 0) {
