@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { CellHeader } from '@muralink/ui'
 import { useContacts } from '@muralink/module-contacts/web'
 import { useExpenses } from '../expensesStore.ts'
 import { euros, formatMoney } from '../../../types.ts'
@@ -29,7 +30,7 @@ export function OverviewCard({ onOpenAccount }: { onOpenAccount?: (contactId: st
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>Cuentas</div>
+      <CellHeader title="Cuentas" style={{ fontWeight: 600, color: 'var(--fg)' }} />
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {rows.length === 0 ? (
           <div style={{ padding: 16, fontSize: 11, color: 'var(--fg-faint)', textAlign: 'center' }}>Sin movimientos</div>

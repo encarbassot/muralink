@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import type React from 'react'
 import type { GridCellRecord, GridCellPosition, GridSize } from '@muralink/types'
 import { bentoSizeToCols } from './BentoGrid.js'
 import { sizeSpan, snap05 } from './grid/algorithm.js'
 import { CellMenu, type CellMenuItem } from './CellMenu.js'
+import { CellChromeProvider } from './CellHeader.js'
 
 // ── Resize helpers ────────────────────────────────────────────────────────────
 
@@ -244,20 +245,53 @@ export function GridCell({
   children,
   style,
 }: GridCellProps) {
-  const [hovered, setHovered] = useState(false)
   // Kept true for the whole resize gesture so the handle survives the pointer
   // leaving the cell bounds while dragging the corner outward.
   const [resizing, setResizing] = useState(false)
-  // Viewport anchor for the header ⋯ menu while open, else null.
-  const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number } | null>(null)
-  const menuItems = getCellMenu?.(cell) ?? []
+  // Placement is a mode you enter deliberately, one cell at a time. Before this
+  // it was ambient: every card grew eight grab dots and an invisible drag strip
+  // on hover, which meant a stray drag could rearrange a dashboard you were
+  // only reading, and the strip covered whatever header the widget had drawn.
+  const [arranging, setArranging] = useState(false)
+  // Widgets that render a <CellHeader> host the ⋯ themselves. Those that do not
+  // — a bare chart, a read-only list — still need a way in, so the grid draws a
+  // small fallback button for them. Counting registrations rather than assuming
+  // is what lets both kinds coexist while views migrate one at a time.
+  const [headers, setHeaders] = useState(0)
+  const [fallbackAnchor, setFallbackAnchor] = useState<{ top: number; right: number } | null>(null)
+  const registerHeader = useCallback(() => {
+    setHeaders((n) => n + 1)
+    return () => setHeaders((n) => n - 1)
+  }, [])
+
+  const menuItems: CellMenuItem[] = useMemo(() => [
+    ...(getCellMenu?.(cell) ?? []),
+    ...(onEditClick
+      ? [{ id: 'configure', label: 'Configurar widget', icon: '✏', group: 'grid', onSelect: () => onEditClick() }]
+      : []),
+    ...(onResize || onDragStart
+      ? [{
+          id: 'arrange',
+          label: 'Cambiar posición y tamaño',
+          icon: '⤢',
+          group: 'grid',
+          onSelect: () => setArranging(true),
+        }]
+      : []),
+  ], [cell, getCellMenu, onEditClick, onResize, onDragStart])
 
   // Focus model: the focused cell shows edit chrome + interactive content;
   // legacy editMode shows chrome + a click shield. focusMode never shields
   // (the read-only vs interactive split is handled by the widget via ctx.focused).
-  const chrome = editMode || focused
   const shield = editMode && !focused
-  const resizeAllowed = focusMode ? (editMode || focused) : true
+  // One switch now: the drag strip and the grab dots appear together, only for
+  // the cell being placed. editMode still arms every cell at once, which is what
+  // the "rearrange everything" affordance in the toolbar means.
+  const placing = arranging || editMode
+
+  // Stable identity: the provider value is read by every header in the subtree,
+  // and a fresh object each render would re-run their effects.
+  const chromeValue = useMemo(() => ({ menuItems, registerHeader }), [menuItems, registerHeader])
 
   const { cols: colSpan, rows: rowSpan } = bentoSizeToCols(cell.size)
   const unitW = cellSize + gap
@@ -269,8 +303,6 @@ export function GridCell({
   return (
     <div
       data-cell-id={cell.id}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onClick={editMode ? undefined : focusMode ? (focused ? undefined : onFocus) : onClick}
       style={{
         position: 'absolute',
@@ -280,9 +312,12 @@ export function GridCell({
         height,
         borderRadius: 'var(--capsule-radius, 14px)',
         background: 'var(--bg, #f9f7f4)',
-        border: `1px solid ${focused || (editMode && hovered) || (resizeAllowed && (hovered || resizing)) ? 'var(--accent, #4c9fff)' : 'var(--border, #d4cfc9)'}`,
+        // Only a card being placed gets an accent outline. A plain hover no
+        // longer lights up every border, which is what made a dashboard look
+        // permanently editable.
+        border: `1px solid ${focused || placing ? 'var(--accent, #4c9fff)' : 'var(--border, #d4cfc9)'}`,
         boxShadow: focused ? '0 0 0 2px var(--accent-dim, rgba(76,159,255,0.35))' : undefined,
-        overflow: chrome || hovered || resizing ? 'visible' : 'hidden',
+        overflow: placing || resizing ? 'visible' : 'hidden',
         boxSizing: 'border-box',
         cursor: focusMode ? (focused ? 'default' : 'pointer') : editMode ? 'default' : onClick ? 'pointer' : 'default',
         userSelect: 'none',
@@ -298,7 +333,7 @@ export function GridCell({
     >
       {/* Clip the content inside rounded corners separately from the resize overlay */}
       <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', overflow: 'hidden' }}>
-        {children}
+        <CellChromeProvider value={chromeValue}>{children}</CellChromeProvider>
       </div>
 
       {/* Global edit mode: transparent shield prevents child-click accidents.
@@ -310,8 +345,51 @@ export function GridCell({
         />
       )}
 
-      {/* Drag handle + config bar — shown for the focused cell or in edit mode */}
-      {chrome && (
+      {/* Fallback ⋯ for widgets with no header of their own. Appears on hover
+          so it does not sit permanently on top of someone's content. */}
+      {headers === 0 && menuItems.length > 0 && !placing && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setFallbackAnchor(
+              fallbackAnchor ? null : { top: r.bottom + 4, right: Math.max(4, window.innerWidth - r.right) },
+            )
+          }}
+          title="Opciones del widget"
+          aria-label="Opciones del widget"
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            zIndex: 20,
+            background: 'var(--bg-elevated, rgba(255,255,255,0.9))',
+            border: '1px solid var(--border, #d4cfc9)',
+            borderRadius: 6,
+            color: 'var(--fg-dim, #6b6560)',
+            cursor: 'pointer',
+            fontSize: 14,
+            lineHeight: 1,
+            padding: '2px 6px',
+            opacity: fallbackAnchor ? 1 : 0,
+            transition: 'opacity 0.12s',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+          onMouseLeave={(e) => { if (!fallbackAnchor) (e.currentTarget as HTMLElement).style.opacity = '0' }}
+        >
+          ⋯
+        </button>
+      )}
+
+      {fallbackAnchor && (
+        <CellMenu items={menuItems} anchor={fallbackAnchor} onClose={() => setFallbackAnchor(null)} />
+      )}
+
+      {/* Placement bar. Only while placing, so it can never sit on top of a
+          widget's own header — the reason it existed as an always-on strip was
+          also the reason header buttons were unreachable. */}
+      {placing && (
         <div
           style={{
             position: 'absolute',
@@ -322,16 +400,15 @@ export function GridCell({
             display: 'flex',
             alignItems: 'center',
             padding: '0 6px 0 8px',
-            gap: 4,
-            opacity: hovered || isDragging ? 1 : 0,
-            transition: 'opacity 0.15s',
+            gap: 6,
             zIndex: 20,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)',
             borderRadius: 'var(--capsule-radius, 14px) var(--capsule-radius, 14px) 0 0',
-            pointerEvents: hovered || isDragging ? 'auto' : 'none',
+            pointerEvents: 'auto',
           }}
         >
-          {/* Drag handle */}
+          {/* The whole strip is the grab area: a 10px dotted glyph was a small
+              target for the one gesture this mode exists for. */}
           <div
             onPointerDown={(e) => {
               if (e.button !== 0) return
@@ -340,83 +417,53 @@ export function GridCell({
               onDragStart?.(cell.id, cell.position, e)
             }}
             style={{
-              cursor: isDragging ? 'grabbing' : 'grab',
-              color: 'rgba(255,255,255,0.65)',
-              fontSize: 12,
-              padding: '4px 5px',
-              borderRadius: 4,
+              flex: 1,
+              alignSelf: 'stretch',
               display: 'flex',
               alignItems: 'center',
-              lineHeight: 1,
-              letterSpacing: 1,
+              gap: 6,
+              cursor: isDragging ? 'grabbing' : 'grab',
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: 11,
+              letterSpacing: 0.2,
             }}
-            title="Drag to move"
+            title="Arrastra para mover"
           >
-            ⠿⠿
+            <span style={{ letterSpacing: 1 }}>⠿⠿</span>
+            <span>Arrastra para mover · tira de los puntos para redimensionar</span>
           </div>
 
-          <div style={{ flex: 1 }} />
-
-          {/* ⋯ context menu button — grid options + module methods */}
-          {menuItems.length > 0 && (
+          {/* Leaving the mode is explicit. editMode is driven by the toolbar, so
+              a card armed that way is not something this button should switch off. */}
+          {arranging && (
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation()
-                const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                setMenuAnchor(
-                  menuAnchor ? null : { top: r.bottom + 4, right: Math.max(4, window.innerWidth - r.right) },
-                )
+                setArranging(false)
               }}
               style={{
-                background: 'rgba(255,255,255,0.12)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.16)',
+                border: '1px solid rgba(255,255,255,0.28)',
                 borderRadius: 5,
-                color: 'rgba(255,255,255,0.85)',
+                color: '#fff',
                 cursor: 'pointer',
-                fontSize: 13,
-                padding: '2px 7px',
-                display: 'flex',
-                alignItems: 'center',
+                fontSize: 11,
+                fontWeight: 600,
+                padding: '3px 9px',
                 lineHeight: 1,
               }}
-              title="Widget menu"
             >
-              ⋯
+              Listo
             </button>
           )}
-
-          {/* Pencil / configure button */}
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              onEditClick?.()
-            }}
-            style={{
-              background: 'rgba(255,255,255,0.12)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: 5,
-              color: 'rgba(255,255,255,0.85)',
-              cursor: 'pointer',
-              fontSize: 11,
-              padding: '2px 7px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              lineHeight: 1,
-            }}
-            title="Configure widget"
-          >
-            ✏
-          </button>
         </div>
       )}
 
       {/* Resize handles — 4 corners + 4 edge midpoints. In focus mode only the
           focused cell (or global edit mode) can resize; otherwise available on
           hover (legacy default). */}
-      {(hovered || isDragging || resizing) && resizeAllowed && (
+      {placing && (
         <ResizeHandles
           cell={cell}
           cellSize={cellSize}
@@ -427,10 +474,6 @@ export function GridCell({
         />
       )}
 
-      {/* Header ⋯ dropdown (portaled to body so it escapes the clip container) */}
-      {menuAnchor && menuItems.length > 0 && (
-        <CellMenu items={menuItems} anchor={menuAnchor} onClose={() => setMenuAnchor(null)} />
-      )}
     </div>
   )
 }

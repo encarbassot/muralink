@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CellHeader } from '@muralink/ui'
 import { useVault, type DecryptedEntry } from '../vaultStore.ts'
 
 const inputStyle: React.CSSProperties = {
@@ -162,28 +163,22 @@ export function PasswordVault() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', fontFamily: 'inherit' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px 12px',
-          borderBottom: '1px solid var(--border, #d4cfc9)',
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 500 }}>🔐 Bóveda ({entries.length})</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setAdding((a) => !a)} style={{ ...buttonStyle, padding: '4px 8px' }}>
-            {adding ? 'Cancelar' : '+ Añadir'}
-          </button>
-          <button
-            onClick={lock}
-            style={{ ...buttonStyle, background: 'var(--border, #d4cfc9)', color: 'inherit', padding: '4px 8px' }}
-          >
-            Bloquear
-          </button>
-        </div>
-      </div>
+      <CellHeader
+        title={`🔐 Bóveda (${entries.length})`}
+        actions={
+          <>
+            <button onClick={() => setAdding((a) => !a)} style={{ ...buttonStyle, padding: '4px 8px' }}>
+              {adding ? 'Cancelar' : '+ Añadir'}
+            </button>
+            <button
+              onClick={lock}
+              style={{ ...buttonStyle, background: 'var(--border, #d4cfc9)', color: 'inherit', padding: '4px 8px' }}
+            >
+              Bloquear
+            </button>
+          </>
+        }
+      />
 
       {adding && (
         <div

@@ -49,6 +49,8 @@ export type { SidebarItem } from './Sidebar.tsx'
 export { GridCanvas } from './GridCanvas.tsx'
 export { GridCell } from './GridCell.tsx'
 export { CellMenu } from './CellMenu.tsx'
+export { CellHeader, CellChromeProvider, useCellChrome } from './CellHeader.tsx'
+export type { CellHeaderProps, CellChrome } from './CellHeader.tsx'
 export type { CellMenuItem } from './CellMenu.tsx'
 export { GridConfigPanel } from './GridConfigPanel.tsx'
 

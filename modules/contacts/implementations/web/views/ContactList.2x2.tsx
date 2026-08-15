@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CellHeader } from '@muralink/ui'
 import type { YContact } from '../../../types.ts'
 
 interface Props {
@@ -23,23 +24,25 @@ export function ContactList({ contacts = [], onContactClick, readOnly = false }:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', fontFamily: 'inherit' }}>
       {!readOnly && (
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border, #d4cfc9)' }}>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar contacto..."
-            style={{
-              width: '100%',
-              border: '1px solid var(--border, #d4cfc9)',
-              borderRadius: 6,
-              padding: '6px 10px',
-              fontSize: 13,
-              outline: 'none',
-              background: 'var(--background, #f9f7f4)',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
+        <CellHeader
+          title={
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar contacto..."
+              style={{
+                width: '100%',
+                border: '1px solid var(--border, #d4cfc9)',
+                borderRadius: 6,
+                padding: '6px 10px',
+                fontSize: 13,
+                outline: 'none',
+                background: 'var(--background, #f9f7f4)',
+                boxSizing: 'border-box',
+              }}
+            />
+          }
+        />
       )}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {filtered.map(contact => (

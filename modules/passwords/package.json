@@ -1,7 +1,7 @@
 {
   "name": "@muralink/module-passwords",
   "version": "0.1.0",
-  "description": "passwords — a local-only vault gated by a 6-digit PIN. Stores a url, username and password per entry; the password is AES-GCM encrypted with a key derived from the PIN and never leaves the device.",
+  "description": "passwords \u2014 a local-only vault gated by a 6-digit PIN. Stores a url, username and password per entry; the password is AES-GCM encrypted with a key derived from the PIN and never leaves the device.",
   "type": "module",
   "main": "./manifest.ts",
   "exports": {
@@ -19,6 +19,7 @@
   "dependencies": {
     "@muralink/spaces": "^0.1.0",
     "@muralink/types": "^0.1.0",
+    "@muralink/ui": "^0.1.0",
     "zustand": "^5.0.8"
   },
   "peerDependencies": {
