@@ -139,11 +139,29 @@ export interface AcmeOptions {
 // Issue via certbot's webroot plugin. Webroot (not --nginx) on purpose: the
 // nginx plugin rewrites our managed site file behind our back, and this file is
 // the authority on what that site contains.
+// A name a public CA could plausibly issue for: a dotted FQDN that is not an
+// IP address. Deliberately not a validity check — DNS and the challenge decide
+// that. This only filters out the names that make the request fail outright.
+export function isPubliclyCertifiable(name: string): boolean {
+  const trimmed = name.trim()
+  if (!trimmed || !trimmed.includes('.')) return false
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(trimmed)) return false // IPv4
+  if (trimmed.includes(':')) return false // IPv6
+  if (trimmed.endsWith('.local')) return false // mDNS, not public
+  return true
+}
+
 export async function issueAcme(opts: AcmeOptions): Promise<IssueResult> {
   if (!which('certbot')) {
     return { ok: false, pair: null, message: 'certbot is not installed' }
   }
-  const domains = [opts.domain, ...(opts.aliases ?? [])].flatMap((d) => ['-d', d])
+  // Aliases exist so nginx answers to the LAN address and the bare hostname
+  // too. A public CA can validate neither: Let's Encrypt refuses bare IPs
+  // outright, and a single-label name like `gamma` has no public DNS to prove.
+  // Including them does not weaken the certificate — it fails the whole request,
+  // taking the valid domain down with it. nginx keeps serving them over HTTP.
+  const certifiable = (opts.aliases ?? []).filter(isPubliclyCertifiable)
+  const domains = [opts.domain, ...certifiable].flatMap((d) => ['-d', d])
   const args = [
     'certonly', '--webroot', '-w', ACME_WEBROOT,
     ...domains,
