@@ -14,20 +14,21 @@
 //     summary. The operator is on an SSH session and needs the actual error.
 
 import { existsSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   dnsA, freeBytes, hostInfo, installCmd, portFree, portHolder, publicIp,
   run, runPrivileged, which,
 } from './system'
-import {
-  ACME_WEBROOT, applySite, htpasswdPath, nginxStatus, writeHtpasswd,
-} from './nginx'
+import { randomBytes } from 'node:crypto'
+import { ACME_WEBROOT, applySite, nginxStatus } from './nginx'
+import { hashPassword } from '../session'
 import {
   acmePaths, certInfo, ensureSelfSigned, installRenewHook, issueAcme,
   renewalStatus, selfSignedPaths,
 } from './certs'
 import { installUnit, journal, systemdStatus } from './systemd'
-import { publicUrl, runtimeEnv, type DeployConfig } from './config'
+import { publicUrl, runtimeEnv, saveDeployConfig, type DeployConfig } from './config'
 
 export type StepState = 'ok' | 'todo' | 'warn' | 'fail'
 
@@ -145,7 +146,7 @@ const identity: DeployStep = {
 // ── 3. system packages ───────────────────────────────────────────────────────
 
 // certbot only matters on the ACME path; openssl is needed on every path
-// (self-signed certs, htpasswd fallback). git is how the box updates itself.
+// (self-signed certs, password hashing). git is how the box updates itself.
 function requiredPackages(cfg: DeployConfig): { bin: string; pkg: string; optional?: boolean }[] {
   const list = [
     { bin: 'openssl', pkg: 'openssl' },
@@ -504,6 +505,35 @@ const storage: DeployStep = {
 
 // ── 9. daemon as a service ───────────────────────────────────────────────────
 
+// Turn the operator's password into the two things the running service needs:
+// an scrypt hash to check logins against, and a key to sign session cookies
+// with. Both are persisted; the password is not. Called from the service step
+// because the systemd environment file is written there — the gate has to be
+// in the environment before the frontend server reads it at boot.
+async function ensureGateCredentials(ctx: StepContext): Promise<string | null> {
+  const { cfg } = ctx
+  if (!cfg.basicAuthUser) return null
+
+  let changed = false
+  const pw = ctx.secrets.basicAuthPassword
+  if (pw) {
+    cfg.authHash = hashPassword(pw)
+    changed = true
+  }
+  if (!cfg.sessionSecret) {
+    // Rotating this logs every session out — the emergency exit if a laptop
+    // with an open session is lost.
+    cfg.sessionSecret = randomBytes(32).toString('hex')
+    changed = true
+  }
+  if (changed) saveDeployConfig(cfg)
+
+  if (!cfg.authHash) {
+    return 'no gate password set — pass MURALINK_AUTH_PASSWORD and re-run this step'
+  }
+  return null
+}
+
 const service: DeployStep = {
   id: 'service',
   title: 'Orchester service',
@@ -519,6 +549,12 @@ const service: DeployStep = {
   async apply(ctx) {
     const nodeBin = which('node')
     if (!nodeBin) return fail('node not found on PATH')
+
+    // Before the unit: the environment file carries the gate, and a service
+    // that starts without it serves the instance to anyone who asks.
+    const gateProblem = await ensureGateCredentials(ctx)
+    if (gateProblem) return fail(gateProblem)
+
     ctx.log('writing unit + environment file…')
     const res = await installUnit(
       {
@@ -594,13 +630,13 @@ const webserver: DeployStep = {
     const hints = [
       st.version ? `nginx ${st.version}` : 'nginx not installed',
       `site ${st.sitePath}`,
-      existsSync(htpasswdPath()) ? `auth gate ${htpasswdPath()}` : 'auth gate NOT configured',
+      cfg.authHash ? `auth gate: login as "${cfg.basicAuthUser}"` : 'auth gate NOT configured',
     ]
     if (!st.installed) return todo('nginx not installed', hints)
     if (!st.siteEnabled) return todo('site not written', hints)
     if (st.configValid === false) return fail('nginx -t rejects the current config', hints)
     if (!st.running) return fail('nginx is not running', hints)
-    if (!existsSync(htpasswdPath()) && cfg.basicAuthUser) return todo('site up but the auth gate is missing', hints)
+    if (!cfg.authHash && cfg.basicAuthUser) return todo('site up but the auth gate has no password', hints)
     return ok('site enabled and nginx reloaded', hints)
   },
   async apply(ctx) {
@@ -608,17 +644,10 @@ const webserver: DeployStep = {
     if (cfg.webServer === 'none') return ok('skipped')
 
     // The gate first: a site that comes up ungated, even for a few seconds, is
-    // a public instance with no password on the open internet.
-    if (cfg.basicAuthUser) {
-      const pw = ctx.secrets.basicAuthPassword
-      if (!pw && !existsSync(htpasswdPath())) {
-        return fail('set a password for the auth gate before applying this step')
-      }
-      if (pw) {
-        ctx.log(`writing auth gate for "${cfg.basicAuthUser}"…`)
-        const gate = await writeHtpasswd(htpasswdPath(), cfg.basicAuthUser, pw)
-        if (!gate.ok) return fail(gate.message)
-      }
+    // a public instance with no password on the open internet. The credentials
+    // themselves live in the service environment, written by the service step.
+    if (cfg.basicAuthUser && !cfg.authHash) {
+      return fail('the login gate has no password yet — apply the service step with MURALINK_AUTH_PASSWORD set')
     }
 
     // Certificates are issued in the next step and HTTP-01 needs :80 answering,
@@ -635,7 +664,6 @@ const webserver: DeployStep = {
       mode,
       certPath: certs.certPath,
       keyPath: certs.keyPath,
-      htpasswdPath: cfg.basicAuthUser ? htpasswdPath() : undefined,
       apiToken: cfg.basicAuthUser ? cfg.apiToken : undefined,
     })
     if (!res.ok) return fail(res.message)
@@ -712,8 +740,7 @@ const tls: DeployStep = {
         mode: 'https',
         certPath: paths.certPath,
         keyPath: paths.keyPath,
-        htpasswdPath: cfg.basicAuthUser ? htpasswdPath() : undefined,
-        apiToken: cfg.basicAuthUser ? cfg.apiToken : undefined,
+          apiToken: cfg.basicAuthUser ? cfg.apiToken : undefined,
       })
       if (!site.ok) return fail(site.message)
     }
@@ -735,10 +762,28 @@ const verify: DeployStep = {
 
     // curl, not fetch: a self-signed cert must be testable, and only curl lets
     // us say "insecure but reachable" as a distinct outcome.
-    const auth = cfg.basicAuthUser && ctx.secrets.basicAuthPassword
-      ? ['-u', `${cfg.basicAuthUser}:${ctx.secrets.basicAuthPassword}`]
-      : []
     const insecure = cfg.tls === 'self-signed' ? ['-k'] : []
+
+    // Sign in the way a browser does — post the form, keep the cookie — so this
+    // exercises the real gate rather than a side door kept open for testing.
+    const jar = join(tmpdir(), `muralink-verify-${process.pid}.cookies`)
+    const auth: string[] = []
+    if (cfg.basicAuthUser && ctx.secrets.basicAuthPassword) {
+      const login = await run('curl', [
+        ...insecure, '-sS', '-o', '/dev/null', '-w', '%{http_code}',
+        '-c', jar,
+        '--data-urlencode', `user=${cfg.basicAuthUser}`,
+        '--data-urlencode', `password=${ctx.secrets.basicAuthPassword}`,
+        `${base}/__login`, '--max-time', '15',
+      ])
+      const code = login.stdout.trim()
+      hints.push(`POST /__login    → ${code}`)
+      // A rejected login redirects back to the form with ?error=1, so a 302 is
+      // not by itself proof: the cookie is.
+      if (code !== '302') problems.push(`login returned ${code || 'nothing'}`)
+      else if (!existsSync(jar)) problems.push('login accepted but set no session cookie')
+      else auth.push('-b', jar)
+    }
 
     const front = await run('curl', [...insecure, ...auth, '-sS', '-o', '/dev/null', '-w', '%{http_code}', base, '--max-time', '15'])
     const frontCode = front.stdout.trim()
@@ -755,12 +800,16 @@ const verify: DeployStep = {
     else if (apiCode !== '200') problems.push(`storage API returned ${apiCode}`)
 
     // Unauthenticated request must NOT get through when a gate is configured.
+    // It is sent to the login page — a redirect, not a 401, because a 401 is
+    // what makes a browser open its own credential dialog.
     if (cfg.basicAuthUser) {
       const naked = await run('curl', [...insecure, '-sS', '-o', '/dev/null', '-w', '%{http_code}', base, '--max-time', '15'])
       const code = naked.stdout.trim()
-      hints.push(`GET / without credentials → ${code}`)
-      if (code !== '401') problems.push(`the auth gate is not enforcing (expected 401, got ${code})`)
+      hints.push(`GET / without a session → ${code}`)
+      if (code !== '302') problems.push(`the auth gate is not enforcing (expected 302 to the login page, got ${code})`)
     }
+
+    if (existsSync(jar)) await run('rm', ['-f', jar])
 
     if (problems.length) return fail(problems.join('; '), hints)
     return ok('the instance answers from the outside', hints)

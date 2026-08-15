@@ -9,15 +9,15 @@
 // The single most important decision encoded here: **the browser never holds
 // the core's API token**. platforms/web bakes its token into the JS bundle, so
 // a publicly reachable frontend would hand every visitor full instance access.
-// Instead nginx authenticates the human (htpasswd) and rewrites Authorization
-// to the master bearer token on the way upstream. The token stays on the box.
+// Instead nginx authenticates the human (a signed session cookie, checked via
+// auth_request against the frontend server) and rewrites Authorization to the
+// master bearer token on the way upstream. The token stays on the box.
 //
 // This file only renders and applies config; it decides nothing about certs
 // (certs.ts) or about when to run (steps.ts). A future apache.ts implements the
 // same WebServerIntegration shape.
 
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { run, runPrivileged, which, writePrivileged, type RunResult } from './system'
 
 export const ACME_WEBROOT = '/var/www/muralink-acme'
@@ -36,9 +36,8 @@ export interface NginxSiteConfig {
   mode: 'http' | 'https'
   certPath?: string
   keyPath?: string
-  // When set, nginx requires basic auth and injects this bearer token upstream.
-  // Absent = no gate: only correct on a trusted LAN.
-  htpasswdPath?: string
+  // When set, nginx requires a valid session and injects this bearer token
+  // upstream. Absent = no gate: only correct on a trusted LAN.
   apiToken?: string
   // Upload ceiling. 0 = unlimited (self-host default — it is your disk).
   maxBodySize?: string
@@ -109,25 +108,7 @@ export function renderSite(cfg: NginxSiteConfig): string {
   const upstreamHost = cfg.upstreamHost ?? '127.0.0.1'
   const names = [cfg.domain, ...(cfg.aliases ?? [])].join(' ')
   const maxBody = cfg.maxBodySize ?? '0'
-  const gated = Boolean(cfg.htpasswdPath && cfg.apiToken)
-
-  // Auth block. `satisfy any` + the ACME allow is not needed here because the
-  // challenge location sits outside the gated location, but the storage token
-  // path is: <img src="/api/storage/serve?token=…"> and download links cannot
-  // send a basic-auth header from a fresh context, so those keep working via
-  // the query token the core already understands.
-  const authBlock = gated
-    ? `
-        auth_basic            "Muralink";
-        auth_basic_user_file  ${cfg.htpasswdPath};
-
-        # The browser is authenticated by nginx; the CORE is authenticated by
-        # this header. Overwriting it here is what keeps the master token off
-        # the client.
-        proxy_set_header      Authorization "Bearer ${cfg.apiToken}";`
-    : `
-        # No auth gate configured — every reader of this address has full
-        # instance access. Only acceptable on a trusted LAN.`
+  const gated = Boolean(cfg.apiToken)
 
   const proxyCommon = `
         proxy_http_version    1.1;
@@ -144,6 +125,57 @@ export function renderSite(cfg: NginxSiteConfig): string {
         proxy_request_buffering off;
         proxy_read_timeout    3600s;
         proxy_send_timeout    3600s;`
+
+  // Auth block. The gate is a signed session cookie, checked by asking the
+  // frontend server through auth_request. Not basic auth: the browser's own
+  // credential dialog cannot be styled, cannot be logged out of, and on a typo
+  // several browsers will not re-prompt without clearing site data.
+  //
+  // The 401 from auth_request is turned into the login *page* rather than
+  // passed through, so a browser never sees a WWW-Authenticate challenge.
+  const authBlock = gated
+    ? `
+        auth_request          /__auth;
+        error_page 401        = @login;
+
+        # The browser is authenticated by the session cookie; the CORE is
+        # authenticated by this header. Overwriting it here is what keeps the
+        # master token off the client.
+        proxy_set_header      Authorization "Bearer ${cfg.apiToken}";`
+    : `
+        # No auth gate configured — every reader of this address has full
+        # instance access. Only acceptable on a trusted LAN.`
+
+  // The three ungated paths. They serve no instance data: /__auth answers the
+  // subrequest, /__login takes a password, /__logout drops the cookie.
+  const authLocations = gated
+    ? `
+    location = /__auth {
+        internal;
+        proxy_pass              http://muralink_frontend;
+        proxy_pass_request_body off;
+        proxy_set_header        Content-Length "";
+        proxy_set_header        Host   $host;
+        proxy_set_header        Cookie $http_cookie;
+    }
+
+    # Where an unauthenticated request lands. 302 rather than rendering in
+    # place, so the address bar matches what is on screen and a refresh after
+    # signing in returns to the page that was asked for.
+    location @login {
+        return 302 /__login?next=$request_uri;
+    }
+
+    location ^~ /__login {
+        proxy_pass http://muralink_frontend;${proxyCommon}
+    }
+
+    location = /__logout {
+        proxy_pass http://muralink_frontend;${proxyCommon}
+    }
+`
+    : ''
+
 
   const header = `# Managed by the Muralink orchester (packages/orchester/src/deploy/nginx.ts).
 # Rewritten whenever the deploy wizard applies the web-server step — put your
@@ -178,7 +210,7 @@ server {
     server_name ${names};
 
     client_max_body_size ${maxBody};
-${acmeLocation}
+${acmeLocation}${authLocations}
     location / {
         proxy_pass http://muralink_frontend;${proxyCommon}${authBlock}
     }
@@ -217,7 +249,7 @@ server {
     add_header Referrer-Policy           "same-origin" always;
 
     client_max_body_size ${maxBody};
-
+${authLocations}
     location / {
         proxy_pass http://muralink_frontend;${proxyCommon}${authBlock}
     }
@@ -276,23 +308,3 @@ export async function reloadNginx(): Promise<RunResult> {
   return runPrivileged('nginx', ['-s', 'reload'])
 }
 
-// Create/replace the single basic-auth user. Prefers htpasswd; falls back to
-// openssl passwd -apr1, which is the same crypt format nginx expects and is
-// present on every box that already has openssl (which we require anyway).
-export async function writeHtpasswd(path: string, user: string, password: string): Promise<ApplyResult> {
-  if (which('htpasswd')) {
-    const res = await runPrivileged('htpasswd', ['-bc', path, user, password])
-    if (!res.ok) return { ok: false, path, message: res.stderr }
-  } else {
-    const hash = await run('openssl', ['passwd', '-apr1', password])
-    if (!hash.ok) return { ok: false, path, message: `openssl passwd: ${hash.stderr}` }
-    const written = await writePrivileged(path, `${user}:${hash.stdout.trim()}\n`)
-    if (!written.ok) return { ok: false, path, message: written.stderr }
-  }
-  // nginx (the worker user) must read it; nobody else should.
-  await runPrivileged('chmod', ['0640', path])
-  await runPrivileged('chown', ['root:www-data', path])
-  return { ok: true, path, message: `basic-auth user "${user}" written to ${path}` }
-}
-
-export const htpasswdPath = (): string => join('/etc/nginx', `${SITE_NAME}.htpasswd`)

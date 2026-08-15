@@ -10,6 +10,7 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import type { Orchester, ServiceConfig } from '../orchester'
+import { sessionFromEnv } from '../session'
 import { FrontendServer } from '../frontend-server'
 import { HttpsGateway } from '../https-gateway'
 
@@ -102,6 +103,9 @@ function webFrontendService(orchester: Orchester): ServiceConfig {
         servePath: liveCfg(orchester, 'web-frontend')?.path ?? join(repoRoot, 'platforms/web/dist'),
         port: cfg?.port ?? WEB_PORT,
         apiPort: liveCfg(orchester, 'core')?.port ?? CORE_PORT,
+        // The login gate, when the deploy wizard configured one. Absent on a
+        // plain LAN run, where nothing is gating anything anyway.
+        session: sessionFromEnv() ?? undefined,
       })
       return { port }
     },

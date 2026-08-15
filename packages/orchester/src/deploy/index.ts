@@ -15,7 +15,7 @@ export {
   type DeployConfig, type TlsMode, type WebServer,
 } from './config'
 export {
-  applySite, htpasswdPath, nginxStatus, reloadNginx, renderSite, siteLayout, writeHtpasswd,
+  applySite, nginxStatus, reloadNginx, renderSite, siteLayout,
   ACME_WEBROOT, SITE_NAME,
   type NginxSiteConfig, type NginxStatus,
 } from './nginx'

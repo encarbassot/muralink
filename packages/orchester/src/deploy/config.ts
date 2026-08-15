@@ -2,10 +2,11 @@
 // then reads. Persisted to ~/.elio/deploy.json so a wizard run survives a
 // dropped SSH session, a reboot, or the operator going to lunch mid-deploy.
 //
-// The basic-auth password is deliberately NOT persisted: it exists only in the
-// process that sets it, gets hashed into the htpasswd file, and is gone. The
-// API token IS persisted, because the systemd env file and the nginx site both
-// have to keep agreeing on it.
+// The gate password is deliberately NOT persisted: it exists only in the
+// process that sets it, is hashed with scrypt, and is gone. The hash, the
+// cookie-signing secret and the API token ARE persisted — the running service
+// has to verify logins across restarts, and the systemd env file and the nginx
+// site have to keep agreeing on the token.
 
 import { randomBytes } from 'node:crypto'
 import { readFileSync, writeFileSync, chmodSync } from 'node:fs'
@@ -49,8 +50,13 @@ export interface DeployConfig {
   tls: TlsMode
   // The master bearer token. Never leaves the box: nginx injects it upstream.
   apiToken: string
-  // Basic-auth account nginx gates the site with. Empty user = no gate.
+  // The account that may log in. Empty user = no gate.
   basicAuthUser: string
+  // scrypt hash of the gate password, and the key that signs session cookies.
+  // The password itself is never stored; these two are, because the running
+  // service must verify a login and a signature across restarts.
+  authHash: string
+  sessionSecret: string
 }
 
 export const DEPLOY_STATE = join(elioHome, 'deploy.json')
@@ -79,6 +85,8 @@ export function defaultConfig(): DeployConfig {
     tls: 'acme',
     apiToken: '',
     basicAuthUser: 'admin',
+    authHash: '',
+    sessionSecret: '',
   }
 }
 
@@ -119,6 +127,11 @@ export function runtimeEnv(cfg: DeployConfig): Record<string, string> {
     // The gateway is nginx's job on a server deploy; the Node one stays off.
     ELIO_HTTPS_DOMAIN: cfg.domain,
     NODE_ENV: 'production',
+    // The login gate, read by the frontend server. All three or none: a
+    // half-configured gate is no gate, and the server refuses to guess.
+    MURALINK_AUTH_USER: cfg.basicAuthUser,
+    MURALINK_AUTH_HASH: cfg.authHash,
+    MURALINK_SESSION_SECRET: cfg.sessionSecret,
   }
 }
 

@@ -11,8 +11,8 @@ import { newApiToken, type DeployConfig, type TlsMode, type WebServer } from '..
 
 interface Props {
   config: DeployConfig
-  // The basic-auth password never lands in the config — it is hashed into the
-  // htpasswd file and forgotten. The wizard holds it for this session only.
+  // The gate password never lands in the config — only its scrypt hash does.
+  // The wizard holds the plaintext for this session only.
   password: string
   onSave: (config: DeployConfig, password: string) => void
   onCancel: () => void
