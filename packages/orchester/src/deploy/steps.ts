@@ -27,7 +27,7 @@ import {
   acmePaths, certInfo, ensureSelfSigned, installRenewHook, issueAcme,
   renewalStatus, selfSignedPaths,
 } from './certs'
-import { installUnit, journal, systemdStatus } from './systemd'
+import { ENV_PATH, installUnit, journal, systemdStatus } from './systemd'
 import { publicUrl, runtimeEnv, saveDeployConfig, type DeployConfig } from './config'
 
 export type StepState = 'ok' | 'todo' | 'warn' | 'fail'
@@ -544,7 +544,28 @@ const service: DeployStep = {
     if (!st.unitInstalled) return todo('unit not installed', [`will write /etc/systemd/system/muralink-orchesterd.service`])
     if (!st.active) return fail(`unit installed but not running (${st.detail})`, (await journal(20)).split('\n').slice(-8))
     if (!st.enabled) return warn('running but not enabled — it will not come back after a reboot')
-    return ok(st.detail, [`user ${ctx.cfg.serviceUser}`, `repo ${ctx.cfg.repoRoot}`])
+
+    const hints = [`user ${ctx.cfg.serviceUser}`, `repo ${ctx.cfg.repoRoot}`]
+
+    // A running unit is not the same as a correct one. `apply --all` skips
+    // anything already 'ok', so a step that reports ok on liveness alone can
+    // never deliver a config change — the login gate would sit unconfigured
+    // behind a perfectly healthy service.
+    if (ctx.cfg.basicAuthUser) {
+      if (!ctx.cfg.authHash) {
+        return todo('no login password set yet', [...hints, 'apply this step with MURALINK_AUTH_PASSWORD set'])
+      }
+      const env = await runPrivileged('cat', [ENV_PATH])
+      if (!env.ok || !env.stdout.includes(ctx.cfg.authHash)) {
+        return todo('the service environment does not carry the current login gate', [
+          ...hints,
+          `apply this step to rewrite ${ENV_PATH}`,
+        ])
+      }
+      hints.push(`login gate: "${ctx.cfg.basicAuthUser}"`)
+    }
+
+    return ok(st.detail, hints)
   },
   async apply(ctx) {
     const nodeBin = which('node')
@@ -569,7 +590,9 @@ const service: DeployStep = {
     )
     if (!res.ok) return fail(res.message)
     // Give the daemon a moment to bring the autostart set up before the next
-    // step's health check runs against it.
+    // step's health check runs against it. installUnit restarts the service,
+    // which is what makes a changed environment file take effect — systemd
+    // never rereads it on its own.
     await new Promise((r) => setTimeout(r, 4000))
     return ok(res.message)
   },
