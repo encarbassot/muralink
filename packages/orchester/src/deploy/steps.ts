@@ -283,16 +283,26 @@ const source: DeployStep = {
       hints.push(`configured branch differs: ${repoBranch}`)
     }
     const changed = dirty.stdout.trim().split('\n').filter(Boolean)
+    const lockOnly = changed.length > 0 && changed.every((l) => l.endsWith('package-lock.json'))
     // package-lock.json is modified on every deployed box — npm rewrites it on
     // install. Reporting that as drift trains the operator to ignore the one
     // warning that matters, so it is stated as a fact instead.
-    if (changed.length && changed.every((l) => l.endsWith('package-lock.json'))) {
-      hints.push('package-lock.json is locally generated (expected)')
-      return ok('checkout present', hints)
-    }
-    if (changed.length) {
+    if (lockOnly) hints.push('package-lock.json is locally generated (expected)')
+    else if (changed.length) {
       return warn('checkout has local changes — update would not be a fast-forward', hints)
     }
+
+    // Behind origin is the whole reason this step has an apply(). `apply --all`
+    // skips anything already 'ok', so reporting a stale checkout as ok is what
+    // makes a box silently deploy last month's code — which is exactly what it
+    // did the first time this ran. Cheap and offline: compare against the last
+    // fetched ref, never the network.
+    const behind = await run('git', ['rev-list', '--count', `HEAD..origin/${repoBranch}`], { cwd: repoRoot })
+    const count = Number(behind.stdout.trim())
+    if (behind.ok && Number.isFinite(count) && count > 0) {
+      return todo(`${count} commit${count === 1 ? '' : 's'} behind origin/${repoBranch}`, hints)
+    }
+
     return ok('checkout present', hints)
   },
   async apply(ctx) {
