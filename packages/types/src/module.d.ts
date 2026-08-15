@@ -1,8 +1,33 @@
 /** Where a module can run. A module declares capability; an implementation realizes it. */
 export type Platform = 'web' | 'extension' | 'mobile' | 'local-server' | 'electron';
-/** Bento grid sizes a view can occupy. */
+/** Preset bento sizes a view advertises in menus (add-element picker, defaults). */
 export type BentoSize = '1x1' | '1x2' | '2x1' | '2x2' | '2x3' | '3x2' | '3x3';
+/** Actual geometry a placed cell can hold. Spans snap to 0.5-cell steps, so a
+ *  cell may be 1.5×2, 2.5×1.5, etc. The preset BentoSize values are a subset. */
 export type GridSize = `${number}x${number}`;
+/** Intrinsic shape a widget prefers. The auto layout honors it; freeform ignores it.
+ *  'free' = no preference (default). */
+export type Orientation = 'tall' | 'wide' | 'square' | 'free';
+/** Layout intent a widget declares so the grid can place/size it as a window
+ *  manager would — the "hybrid" model: the widget states constraints, the grid
+ *  solves within them. A per-cell override (GridCellRecord.constraints) merges
+ *  over the module-level default. All fields optional; absent = grid decides. */
+export interface LayoutConstraints {
+    /** Smallest footprint the widget stays usable at. Default 0.5x0.5. */
+    min?: GridSize;
+    /** Largest footprint the grid may grow it to. Default 3x3. Caps "occupy everything". */
+    max?: GridSize;
+    /** Footprint the grid aims for when placing/relaying out. Default = current size. */
+    preferred?: GridSize;
+    /** Preferred aspect ratio (cols/rows), e.g. a tall calendar ~0.66. Advisory. */
+    aspect?: number;
+    /** Intrinsic shape. Steers the default size chosen at add time. */
+    orientation?: Orientation;
+    /** Reflow rank: higher keeps its spot / gets first pick under pressure. Default 0. */
+    priority?: number;
+    /** Elastic: may absorb spare space (grows toward max in auto layout). Default false. */
+    grow?: boolean;
+}
 /** A renderable widget the module exposes. The platform renders it without
  *  knowing what's inside. */
 export interface ViewSpec {

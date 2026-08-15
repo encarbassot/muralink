@@ -1,0 +1,21 @@
+{
+  "name": "@muralink/module-calcsheet",
+  "version": "0.0.0",
+  "description": "calcsheet — a deterministic spreadsheet + programmable logic module. Excel-like formula cells, reusable sandboxed functions, global variables, and block rules. The engine behind pricing and, later, the platform's generic table.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./web": "./implementations/web/index.ts",
+    "./cell": "./cell.tsx",
+    "./server": "./implementations/server/index.ts"
+  },
+  "dependencies": {
+    "@muralink/types": "*",
+    "@muralink/calc": "*",
+    "@muralink/ui": "*",
+    "@muralink/shell": "*"
+  },
+  "license": "MIT"
+}

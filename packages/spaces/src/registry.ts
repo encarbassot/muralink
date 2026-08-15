@@ -38,6 +38,13 @@ export function listSpaces<T extends SpaceEntity>(collection: string): StorageSp
   return [...forCollection(collection).values()] as StorageSpace<T>[]
 }
 
+// Every collection that has registered at least one space. Lets a surface (the
+// local-device file view) enumerate what modules store without hardcoding the
+// list — collections appear here as a side effect of their store importing.
+export function listCollections(): string[] {
+  return [...registries.keys()]
+}
+
 // Stamp every item a space returns with its origin so the store can route
 // later updates/deletes back to the right space.
 export function stamp<T extends SpaceEntity>(id: SpaceId, items: T[]): T[] {

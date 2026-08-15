@@ -1,8 +1,8 @@
 import { api } from './client.ts'
 import type { YCalendarEvent } from '@muralink/module-calendar/types'
 import type { YContact } from '@muralink/module-contacts/types'
-import type { YAppointment, YService, YAvailableSlot } from '@muralink/module-appointments/types'
-import type { YStockItem } from '@muralink/module-stock/types'
+import type { YAppointment, YService, YAvailableSlot } from '@muralink/module-calendar/types'
+import type { YStockItem, YLocation } from '@muralink/module-stock/types'
 
 // Calendar
 export const calendarApi = {
@@ -64,4 +64,13 @@ export const stockApi = {
   adjust: (id: string, delta: number) =>
     api.post<YStockItem>(`/stock/stock/${id}/adjust`, { delta }).then(r => r.data),
   deleteItem: (id: string) => api.delete(`/stock/stock/${id}`),
+
+  // Locations — group/assign products by place.
+  getLocations: () =>
+    api.get<YLocation[]>('/stock/stock/locations').then(r => r.data),
+  createLocation: (body: { name: string; description?: string }) =>
+    api.post<YLocation>('/stock/stock/locations', body).then(r => r.data),
+  updateLocation: (id: string, patch: Partial<Pick<YLocation, 'name' | 'description'>>) =>
+    api.patch<YLocation>(`/stock/stock/locations/${id}`, patch).then(r => r.data),
+  deleteLocation: (id: string) => api.delete(`/stock/stock/locations/${id}`),
 }

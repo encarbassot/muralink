@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { GridCanvas } from '@muralink/ui'
 import type { GridCellRecord, GridLayoutConfig } from '@muralink/types'
 import { storageApi, joinPath, type ListResponse, type StorageEntry } from './storageApi.ts'
+import { MarkdownFileView } from './MarkdownFileView.tsx'
 import { StorageConsole } from './StorageConsole.tsx'
 import { useAppEnv, capabilitiesFor } from './env.ts'
 
@@ -31,7 +32,9 @@ function iconFor(e: StorageEntry): string {
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes < 1024 ** 4) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  return `${(bytes / 1024 ** 4).toFixed(1)} TB`
 }
 
 function parentOf(p: string, root: string): string {
@@ -56,7 +59,15 @@ export function StorageExplorer() {
   const [selected, setSelected] = useState<string | null>(null)
   const [clip, setClip] = useState<Clip>(null)
   const [busy, setBusy] = useState(false)
+  const [usage, setUsage] = useState<{ usedBytes: number; maxBytes: number | null } | null>(null)
+  const [mdFile, setMdFile] = useState<StorageEntry | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  // Owner-only usage indicator; errors swallowed (older cores lack the route).
+  const loadUsage = () => {
+    if (role) return
+    storageApi.usage().then(setUsage).catch(() => {})
+  }
 
   const load = (p?: string) => {
     setLoading(true)
@@ -67,12 +78,14 @@ export function StorageExplorer() {
       .catch(() => {
         // Saved folder may no longer exist — fall back to root once.
         if (p) { try { localStorage.removeItem(PATH_KEY) } catch { /* ignore */ }; setPath(undefined) }
-        else setError('Almacenamiento NAS no disponible — activa el servicio NAS en el orchester.')
+        else setError('Storage no disponible — activa el servicio de almacenamiento en el orchester.')
       })
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { void load(path) }, [path])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadUsage() }, [])
 
   // Remember the current folder for next open / reload.
   useEffect(() => {
@@ -93,8 +106,13 @@ export function StorageExplorer() {
   const wrap = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     try { await fn(); await load(path) }
-    catch (e) { window.alert(String((e as { message?: string })?.message ?? e)) }
-    finally { setBusy(false) }
+    catch (e) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      window.alert(status === 413
+        ? 'Sin espacio: has alcanzado tu límite de almacenamiento.'
+        : String((e as { message?: string })?.message ?? e))
+    }
+    finally { setBusy(false); loadUsage() }
   }
 
   const onUpload = async (files: FileList | null) => {
@@ -150,6 +168,8 @@ export function StorageExplorer() {
 
   function openEntry(e: StorageEntry) {
     if (e.isDir) setPath(e.path)
+    // Markdown opens in the same edit-in-place editor the mural document uses.
+    else if (e.ext === 'md' || e.ext === 'markdown') setMdFile(e)
     else window.open(storageApi.serveUrl(e.path), '_blank')
   }
 
@@ -176,7 +196,14 @@ export function StorageExplorer() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {mdFile && (
+        <MarkdownFileView
+          entry={mdFile}
+          readOnly={!can.write}
+          onClose={() => { setMdFile(null); void load(path); loadUsage() }}
+        />
+      )}
       {/* toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
         {can.write && <TBtn onClick={() => fileInput.current?.click()} disabled={!cwd || busy}>⬆️ Subir</TBtn>}
@@ -189,6 +216,11 @@ export function StorageExplorer() {
         {can.write && <TBtn onClick={onPaste} disabled={!clip || busy}>Pegar{clip ? ` (${clip.entry.name})` : ''}</TBtn>}
         {can.del && <TBtn onClick={() => selectedEntry && onDelete(selectedEntry)} disabled={!selectedEntry || busy} danger>Eliminar</TBtn>}
         <span style={{ flex: 1 }} />
+        {usage && (
+          <span title="Espacio usado en tu almacenamiento" style={{ fontSize: 11, color: 'var(--fg-faint)' }}>
+            usado {humanSize(usage.usedBytes)}{usage.maxBytes ? ` de ${humanSize(usage.maxBytes)}` : ''}
+          </span>
+        )}
         {role && <span style={{ fontSize: 11, color: 'var(--fg-faint)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{role}</span>}
         <span style={{ fontSize: 11, color: 'var(--fg-faint)', wordBreak: 'break-all' }}>{cwd ?? 'NAS'}</span>
       </div>

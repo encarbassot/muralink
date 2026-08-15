@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom'
-import instanceConfig from '@hair-saloon/instance/config'
-import instanceTheme from '@hair-saloon/instance/theme'
+import instanceConfig from '@instance/config'
+import instanceTheme from '@instance/theme'
 
 const NAV = [
   { path: '/', label: 'Dashboard', icon: '⊞' },
   { path: '/calendar', label: 'Calendario', icon: '◻' },
-  { path: '/contacts', label: 'Clientes', icon: '◯' },
+  { path: '/contacts', label: 'Contactos', icon: '◯' },
   { path: '/appointments', label: 'Reservas', icon: '▷' },
 ]
 

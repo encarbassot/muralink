@@ -9,9 +9,12 @@ import type { StorageProvider } from './provider.ts'
 
 // Overlap test: event is in range if it starts before `to` and ends after `from`.
 // Keeps multi-day and all-day events visible on every day they touch.
+// Recurring events (rrule) also match past `from` — their base row may end
+// long before the window while occurrences fall inside it; the view expands.
 export const localProvider: StorageProvider = makeIdbSpace<YCalendarEvent>({
   dbName: 'elio-calendar',
   store: 'events',
   label: 'Este dispositivo',
-  match: (e, q) => (!q.to || e.start.iso < q.to) && (!q.from || e.end.iso > q.from),
+  match: (e, q) =>
+    (!q.to || e.start.iso < q.to) && (!q.from || e.end.iso > q.from || !!e.rrule),
 })

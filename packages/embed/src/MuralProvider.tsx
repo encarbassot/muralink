@@ -60,6 +60,7 @@ function registerOrchesterSpaces(cfg: NonNullable<MuralSpacesConfig['orchester']
     userId,
   }
   registerSpace('notes', makeHttpSpace({ ...common, path: '/api/notes' }))
+  registerSpace('murales', makeHttpSpace({ ...common, path: '/api/murales' }))
   registerSpace('reminders', makeHttpSpace({ ...common, path: '/api/reminders' }))
   registerSpace('contacts', makeHttpSpace({ ...common, path: '/api/contacts/contacts' }))
   registerSpace(

@@ -1,8 +1,8 @@
-import type { GridLayoutConfig } from '@muralink/types'
+import type { GridLayoutConfig, LayoutMode } from '@muralink/types'
 import { Card } from './Card.js'
 import { Input } from './Input.js'
 
-type ConfigPatch = Partial<Pick<GridLayoutConfig, 'columns' | 'cellSize' | 'gap'>>
+type ConfigPatch = Partial<Pick<GridLayoutConfig, 'columns' | 'cellSize' | 'gap' | 'layoutMode'>>
 
 interface GridConfigPanelProps {
   config: GridLayoutConfig
@@ -55,6 +55,36 @@ export function GridConfigPanel({ config, onChange, onClose }: GridConfigPanelPr
             ×
           </button>
         )}
+      </div>
+
+      {/* Placement strategy: freeform (manual) vs auto (window-manager reflow) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span style={{ fontSize: 11, color: 'var(--muted-fg)' }}>Layout</span>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['freeform', 'auto'] as LayoutMode[]).map((m) => {
+            const active = (config.layoutMode ?? 'freeform') === m
+            return (
+              <button
+                key={m}
+                onClick={() => onChange({ layoutMode: m })}
+                style={{
+                  flex: 1,
+                  padding: '5px 8px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  borderRadius: 7,
+                  border: `1px solid ${active ? 'var(--accent, #4c9fff)' : 'var(--border, #d4cfc9)'}`,
+                  background: active ? 'var(--accent-dim, rgba(76,159,255,0.14))' : 'transparent',
+                  color: active ? 'var(--accent, #4c9fff)' : 'var(--muted-fg)',
+                  fontWeight: active ? 600 : 400,
+                }}
+                title={m === 'auto' ? 'Grid orders & reflows widgets automatically' : 'You place widgets freely'}
+              >
+                {m === 'auto' ? 'Auto' : 'Libre'}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <Input

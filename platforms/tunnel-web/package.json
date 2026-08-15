@@ -1,0 +1,31 @@
+{
+  "name": "@muralink/platform-tunnel-web",
+  "version": "0.0.0",
+  "description": "The /tunnel guest frontend — third mount of @muralink/app. Served by the Tunnel at /s/:token; a relayed, role-limited file explorer over another user's instance.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 6200",
+    "build": "vite build",
+    "preview": "vite preview --port 6200"
+  },
+  "dependencies": {
+    "@muralink/app": "*",
+    "@muralink/core": "*",
+    "@muralink/shell": "*",
+    "@muralink/ui": "*",
+    "@muralink/types": "*",
+    "@tanstack/react-query": "^5.51.1",
+    "axios": "^1.7.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.6"
+  },
+  "license": "MIT"
+}

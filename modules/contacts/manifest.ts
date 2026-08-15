@@ -3,8 +3,10 @@ import type { ModuleManifest } from '@muralink/types'
 export const manifest: ModuleManifest = {
   id: 'contacts',
   version: '0.0.0',
-  dependencies: ['url'],
-  types: ['YContact'],
+  // reminders: per-contact todo lists are YReminder items linked by relations.
+  // maps: embedded MapView for contact locations. calendar: embedded CalendarApp (year view) for location date ranges.
+  dependencies: ['url', 'reminders', 'maps', 'calendar'],
+  types: ['YContact', 'YPreparedMessage'],
   views: [
     {
       id: 'contacts-list',

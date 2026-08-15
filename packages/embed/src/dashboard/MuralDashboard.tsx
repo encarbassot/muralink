@@ -14,7 +14,7 @@ import {
   type CellTab,
   type OnClickBinding,
 } from '@muralink/shell'
-import type { GridCellRecord, GridLayoutConfig, GridSize, GridPersistenceAdapter } from '@muralink/types'
+import type { GridCellPosition, GridCellRecord, GridLayoutConfig, GridSize, GridPersistenceAdapter } from '@muralink/types'
 import { localStorageAdapter, sizeSpan, type CellMenuItem } from '@muralink/ui'
 import { NotesApp, MarkdownEditor } from '@muralink/module-notes/web'
 import { ContactsApp } from '@muralink/module-contacts/web'
@@ -208,10 +208,10 @@ function DashboardShell({
     return registry.render(cell, ctx, isDragging)
   }
 
-  function handleResize(cellId: string, size: GridSize) {
+  function handleResize(cellId: string, size: GridSize, position?: GridCellPosition) {
     const cur = layoutRef.current
     if (!cur) return
-    cur.applyCells(cur.cells.map((c) => (c.id === cellId ? { ...c, size } : c)))
+    cur.applyCells(cur.cells.map((c) => (c.id === cellId ? { ...c, size, position: position ?? c.position } : c)))
   }
 
   function slotSize(fallback: GridSize): GridSize {

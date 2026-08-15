@@ -1,0 +1,58 @@
+name: Bug report
+description: Something behaves differently from what it promises
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Found a security issue? Don't file it here — see [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what happened, and what you expected instead.
+      placeholder: |
+        1. Added a Calendar widget to a dashboard
+        2. Went offline
+        3. The widget showed an error instead of the cached events
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Which part — a module, a platform, the deploy wizard?
+      placeholder: modules/calendar, platforms/web
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: How are you running it
+      options:
+        - Web app (platforms/web)
+        - Self-hosted instance (orchester)
+        - Desktop app (Electron)
+        - Browser extension
+        - Embedded (@muralink/embed)
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Version and environment
+      description: Commit or version, OS, browser, Node version.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Errors
+      description: Console output, server logs, or the failing step's stderr. Paste the real error, not a summary.
+      render: shell
+  - type: checkboxes
+    id: offline
+    attributes:
+      label: Offline
+      options:
+        - label: This also happens with the network disconnected
+        - label: This only happens offline

@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Muralink",
+  "version": "0.1.0",
+  "description": "Muralink side panel — your modules as temporary cards.",
+  "action": { "default_title": "Muralink" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "background": { "service_worker": "sw.js" },
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["https://app.mural.ink/*"]
+}

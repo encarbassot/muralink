@@ -4,11 +4,14 @@ import { WeekView } from './WeekView.3x3.tsx'
 import { MonthView } from './MonthView.tsx'
 import { TimelineView } from './TimelineView.tsx'
 import { UpcomingView } from './UpcomingView.tsx'
+import { YearView } from './YearView.tsx'
 
-export type CalendarMode = 'month' | 'week' | 'timeline' | 'upcoming'
+export type CalendarMode = 'month' | 'week' | 'timeline' | 'upcoming' | 'year'
 
 interface Props {
   events?: YCalendarEvent[]
+  /** Which mode to open in — e.g. 'year' for a date-range viewer like contact locations. */
+  defaultMode?: CalendarMode
   /** Fired when the visible range changes so the host can fetch events. */
   onRangeChange?: (from: Date, to: Date) => void
   onEventClick?: (event: YCalendarEvent) => void
@@ -25,8 +28,12 @@ function startOfWeek(d: Date) {
   return x
 }
 
+function startOfYear(d: Date) { return new Date(d.getFullYear(), 0, 1) }
+function endOfYear(d: Date) { return new Date(d.getFullYear(), 11, 31, 23, 59, 59) }
+
 function rangeFor(mode: CalendarMode, anchor: Date): { from: Date; to: Date } {
   if (mode === 'month') return { from: startOfMonth(anchor), to: endOfMonth(anchor) }
+  if (mode === 'year') return { from: startOfYear(anchor), to: endOfYear(anchor) }
   if (mode === 'upcoming') {
     const now = new Date()
     return { from: new Date(now.getTime() - 7 * 86400000), to: new Date(now.getTime() + 60 * 86400000) }
@@ -43,10 +50,11 @@ const MODES: { id: CalendarMode; label: string }[] = [
   { id: 'week', label: 'Semana' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'upcoming', label: 'Próximos' },
+  { id: 'year', label: 'Año' },
 ]
 
-export function CalendarApp({ events = [], onRangeChange, onEventClick, onCreate }: Props) {
-  const [mode, setMode] = useState<CalendarMode>('month')
+export function CalendarApp({ events = [], defaultMode = 'month', onRangeChange, onEventClick, onCreate }: Props) {
+  const [mode, setMode] = useState<CalendarMode>(defaultMode)
   const [anchor, setAnchor] = useState(() => new Date())
 
   const { from, to } = useMemo(() => rangeFor(mode, anchor), [mode, anchor])
@@ -59,6 +67,7 @@ export function CalendarApp({ events = [], onRangeChange, onEventClick, onCreate
   function shift(dir: -1 | 1) {
     const d = new Date(anchor)
     if (mode === 'month') d.setMonth(d.getMonth() + dir)
+    else if (mode === 'year') d.setFullYear(d.getFullYear() + dir)
     else d.setDate(d.getDate() + dir * 7)
     setAnchor(d)
   }
@@ -66,6 +75,8 @@ export function CalendarApp({ events = [], onRangeChange, onEventClick, onCreate
   const title =
     mode === 'month'
       ? anchor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+      : mode === 'year'
+      ? String(anchor.getFullYear())
       : mode === 'upcoming'
       ? 'Próximos eventos'
       : `${startOfWeek(anchor).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
@@ -110,6 +121,7 @@ export function CalendarApp({ events = [], onRangeChange, onEventClick, onCreate
         {mode === 'week' && <WeekView events={events} weekStart={startOfWeek(anchor)} onEventClick={onEventClick} onCreate={onCreate} />}
         {mode === 'timeline' && <TimelineView events={events} anchor={anchor} onEventClick={onEventClick} />}
         {mode === 'upcoming' && <UpcomingView events={events} onEventClick={onEventClick} />}
+        {mode === 'year' && <YearView events={events} anchor={anchor} onEventClick={onEventClick} />}
       </div>
     </div>
   )

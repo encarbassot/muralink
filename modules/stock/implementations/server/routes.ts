@@ -4,8 +4,9 @@ import { randomUUID } from 'node:crypto'
 import {
   getStockItems, getStockItem, createStockItem,
   updateStockItem, adjustQuantity, deleteStockItem, getLowStockItems,
+  getLocations, createLocation, updateLocation, deleteLocation,
 } from './queries.ts'
-import type { YStockItem } from '../../types.ts'
+import type { YStockItem, YLocation } from '../../types.ts'
 
 export function createStockRouter(db: Database): Router {
   const router = Router()
@@ -17,6 +18,34 @@ export function createStockRouter(db: Database): Router {
 
   router.get('/stock/low', (_req, res) => {
     res.json(getLowStockItems(db))
+  })
+
+  // Locations — declared before '/stock/:id' so the :id param never swallows
+  // the 'locations' path segment.
+  router.get('/stock/locations', (_req, res) => {
+    res.json(getLocations(db))
+  })
+
+  router.post('/stock/locations', (req, res) => {
+    const body = req.body as Omit<YLocation, 'id' | 'createdAt'>
+    if (!body.name) { res.status(400).json({ error: 'name required' }); return }
+    const location = createLocation(db, {
+      id: randomUUID(),
+      ...body,
+      createdAt: new Date().toISOString(),
+    })
+    res.status(201).json(location)
+  })
+
+  router.patch('/stock/locations/:id', (req, res) => {
+    const updated = updateLocation(db, req.params['id']!, req.body as Partial<Omit<YLocation, 'id' | 'createdAt'>>)
+    if (!updated) { res.status(404).json({ error: 'not found' }); return }
+    res.json(updated)
+  })
+
+  router.delete('/stock/locations/:id', (req, res) => {
+    if (!deleteLocation(db, req.params['id']!)) { res.status(404).json({ error: 'not found' }); return }
+    res.status(204).end()
   })
 
   router.get('/stock/:id', (req, res) => {

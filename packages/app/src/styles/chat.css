@@ -1,0 +1,194 @@
+/* Chat assistant — floating bubble + panel + proposal cards. Tokens from
+   tokens.css; z-index 990/991 sits under CellMenu (998/999) and over the
+   Breadcrumb pill (300). */
+
+.mural-chat-bubble {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 990;
+  box-shadow: var(--shadow, 0 8px 24px rgba(0, 0, 0, 0.4));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease;
+}
+.mural-chat-bubble:hover {
+  transform: scale(1.06);
+}
+
+.mural-chat-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid var(--bg);
+}
+
+.mural-chat-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 84px;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  height: 560px;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  z-index: 991;
+  overflow: hidden;
+}
+
+.mural-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mural-chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mural-chat-msg {
+  align-self: flex-start;
+  max-width: 85%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mural-chat-msg-user {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.mural-chat-caret {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: mural-chat-blink 1s steps(2, start) infinite;
+}
+@keyframes mural-chat-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.mural-chat-inputrow {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  align-items: flex-end;
+}
+.mural-chat-inputrow textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+  max-height: 120px;
+}
+
+.mural-chat-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-dim, var(--fg));
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mural-chat-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mural-chat-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Default-approve proposal card. The wrapper paints the countdown border with
+   a conic-gradient driven by --mural-arc (0→360deg over the card's
+   animation-duration, set inline from PROPOSAL_TIMEOUT_MS); the inner card is
+   inset 2px. The JS timer in chatStore is the authoritative approve — on
+   engines without @property the border simply doesn't sweep. */
+@property --mural-arc {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.mural-chat-proposal {
+  border-radius: 12px;
+  padding: 2px;
+  background: conic-gradient(var(--accent) var(--mural-arc), var(--border) 0);
+  animation-name: mural-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes mural-countdown {
+  to {
+    --mural-arc: 360deg;
+  }
+}
+
+.mural-chat-proposal-inner {
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mural-chat-applied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--fg-dim, var(--fg));
+  background: color-mix(in srgb, #22c55e 10%, var(--bg-elevated));
+}

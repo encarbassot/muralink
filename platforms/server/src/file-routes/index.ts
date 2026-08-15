@@ -75,6 +75,17 @@ export async function listDir(dir: string): Promise<FileEntry[]> {
   return entries
 }
 
+// Content-Disposition per RFC 5987: HTTP headers are latin-1, so non-ASCII
+// filenames (acentos, emoji…) must ride in the encoded `filename*` param with
+// a sanitized ASCII fallback — a raw UTF-8 name throws ERR_INVALID_CHAR.
+function contentDisposition(name: string): string {
+  const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'")
+  const needsUtf8 = ascii !== name
+  return needsUtf8
+    ? `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`
+    : `inline; filename="${ascii}"`
+}
+
 // Stream a file to the response with MIME + range support.
 export function serveFile(abs: string, req: Request, res: Response): void {
   let st: ReturnType<typeof statSync>
@@ -95,7 +106,7 @@ export function serveFile(abs: string, req: Request, res: Response): void {
       'Accept-Ranges': 'bytes',
       'Content-Length': chunkSize,
       'Content-Type': mime,
-      'Content-Disposition': `inline; filename="${basename(abs)}"`,
+      'Content-Disposition': contentDisposition(basename(abs)),
     })
     createReadStream(abs, { start, end }).pipe(res)
   } else {
@@ -103,7 +114,7 @@ export function serveFile(abs: string, req: Request, res: Response): void {
       'Content-Length': total,
       'Content-Type': mime,
       'Accept-Ranges': 'bytes',
-      'Content-Disposition': `inline; filename="${basename(abs)}"`,
+      'Content-Disposition': contentDisposition(basename(abs)),
     })
     createReadStream(abs).pipe(res)
   }

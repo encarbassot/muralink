@@ -5,6 +5,7 @@
 // core is present — i.e. on the desktop).
 
 import { createContext, useContext } from 'react'
+import type { DockItem } from '@muralink/shell'
 
 export type Platform = 'web' | 'electron' | 'tunnel'
 
@@ -25,6 +26,9 @@ export interface AppEnv {
   hasOrchester: boolean
   // Set only on the tunnel guest mount — limits which storage controls show.
   role?: GuestRole
+  // Extra dock entries a platform injects after the built-in dock (e.g. a slot
+  // hosting platform-specific controls). Generic — the app just renders them.
+  dockItems?: DockItem[]
 }
 
 export const defaultEnv: AppEnv = {

@@ -1,0 +1,30 @@
+{
+  "name": "@muralink/module-mail",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./server": "./implementations/server/index.ts",
+    "./web": "./implementations/web/index.ts",
+    "./cell": "./cell.tsx"
+  },
+  "dependencies": {
+    "@muralink/types": "^0.1.0",
+    "@muralink/ui": "^0.1.0",
+    "zustand": "^5.0.8"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "express": ">=4",
+    "better-sqlite3": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  }
+}

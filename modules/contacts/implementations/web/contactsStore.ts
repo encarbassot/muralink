@@ -43,12 +43,16 @@ interface ContactsState {
   loaded: boolean
   activeSpaces: SpaceId[]
   defaultSpace: SpaceId
+  // The contact currently open in a detail view (ambient context). The chat
+  // assistant reads this to know which ficha the user is looking at.
+  activeContactId?: string
   loadAll: () => Promise<void>
   get: (id: string) => YContact | undefined
   create: (partial?: Partial<YContact>) => Promise<YContact>
   update: (id: string, patch: Partial<YContact>) => Promise<void>
   remove: (id: string) => Promise<void>
   moveContact: (id: string, toSpace: SpaceId) => Promise<void>
+  setActiveContact: (id?: string) => void
   setDefaultSpace: (id: SpaceId) => void
   toggleSpace: (id: SpaceId) => void
 }
@@ -79,6 +83,8 @@ export const useContacts = create<ContactsState>((set, get) => ({
       phone: partial?.phone,
       email: partial?.email,
       notes: partial?.notes,
+      address: partial?.address,
+      location: partial?.location,
       createdAt: partial?.createdAt ?? { iso: new Date().toISOString(), timezone: TZ },
     }
     if (!space) return contact
@@ -117,6 +123,10 @@ export const useContacts = create<ContactsState>((set, get) => ({
     set((s) => ({
       contacts: s.contacts.map((c) => (c.id === id ? created : c)).sort(byName),
     }))
+  },
+
+  setActiveContact(id) {
+    set({ activeContactId: id })
   },
 
   setDefaultSpace(id) {

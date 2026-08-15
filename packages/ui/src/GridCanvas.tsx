@@ -21,12 +21,18 @@ export interface GridCanvasProps {
    * both position and size in one gesture.
    */
   onAddElement?: (col: number, row: number, cols?: number, rows?: number) => void
-  /** Called when a cell is resized via the corner handle. */
-  onCellResize?: (cellId: string, newSize: GridSize) => void
+  /** Called when a cell is resized via one of its 8 edge/corner handles.
+   *  `newPosition` is set when a top/left handle also moved the cell's origin. */
+  onCellResize?: (cellId: string, newSize: GridSize, newPosition?: GridCellPosition) => void
   /** Header ⋯ menu items for a cell (grid options + module methods). Absent = no ⋯. */
   getCellMenu?: (cell: GridCellRecord) => CellMenuItem[]
   /** Resolves a cell's configured click action for VIEW mode. undefined = not clickable. */
   resolveCellClick?: (cell: GridCellRecord) => (() => void) | undefined
+  /** Focus/outfocus model (opt-in). When on: click a cell to focus it (interactive
+   *  + move/resize chrome); all others read-only; click empty space to unfocus. */
+  focusMode?: boolean
+  focusedCellId?: string | null
+  onFocusCell?: (id: string | null) => void
   showGridLines?: boolean
   minHeight?: number
   className?: string
@@ -60,6 +66,9 @@ export function GridCanvas({
   onCellResize,
   getCellMenu,
   resolveCellClick,
+  focusMode = false,
+  focusedCellId = null,
+  onFocusCell,
   showGridLines = false,
   minHeight = 600,
   className,
@@ -164,7 +173,9 @@ export function GridCanvas({
     const col = Math.floor((e.clientX - d.left) / unitW)
     const row = Math.floor((e.clientY - d.top) / unitW)
     if (emptySlotSet.has(`${col}:${row}`)) { onAddElement?.(col, row); return }
-    if (!editMode) onEnterEditMode?.()
+    // Empty non-slot click: unfocus in focus mode, else enter legacy edit mode.
+    if (focusMode) onFocusCell?.(null)
+    else if (!editMode) onEnterEditMode?.()
   }
 
   return (
@@ -246,13 +257,15 @@ export function GridCanvas({
       )}
 
       {/* Grid line overlay (drag active or forced) */}
-      {(isDragging || showGridLines) && editMode && (
+      {(isDragging || showGridLines) && (editMode || focusMode) && (
         <GridLines columns={columns} cellSize={cellSize} gap={gap} height={canvasHeight} />
       )}
 
       {/* Cells */}
       {cells.map((cell) => {
         const { livePos, isDragging: thisDragging, isDisplaced } = cellRenderProps(cell)
+        const isFocused = focusMode && cell.id === focusedCellId
+        const chrome = editMode || isFocused // move/resize/menu affordances
 
         return (
           <GridCell
@@ -265,19 +278,22 @@ export function GridCanvas({
             isDragging={thisDragging}
             isDisplaced={isDisplaced}
             editMode={editMode}
-            onDragStart={editMode ? (id, pos, e) => startDrag(id, pos, e) : undefined}
-            onClick={!editMode && resolveCellClick ? resolveCellClick(cell) : undefined}
+            focusMode={focusMode}
+            focused={isFocused}
+            onFocus={focusMode ? () => onFocusCell?.(cell.id) : undefined}
+            onDragStart={chrome ? (id, pos, e) => startDrag(id, pos, e) : undefined}
+            onClick={!focusMode && !editMode && resolveCellClick ? resolveCellClick(cell) : undefined}
             onEditClick={onCellEditClick ? () => onCellEditClick(cell.id) : undefined}
             onResize={onCellResize}
-            getCellMenu={editMode ? getCellMenu : undefined}
+            getCellMenu={chrome ? getCellMenu : undefined}
           >
             {renderCell(cell, thisDragging)}
           </GridCell>
         )
       })}
 
-      {/* Drop ghost during drag (edit mode) */}
-      {snapTarget && isDragging && editMode && (
+      {/* Drop ghost during drag (edit mode or focus mode) */}
+      {snapTarget && isDragging && (editMode || focusMode) && (
         <SnapGhost
           pos={snapTarget}
           cellId={cells.find((c) => cellRenderProps(c).isDragging)?.id ?? ''}

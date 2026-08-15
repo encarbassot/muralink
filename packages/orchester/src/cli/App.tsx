@@ -6,8 +6,10 @@ import { Box, Text, useApp, useInput } from 'ink'
 import { ensureDaemon, type OrchesterClient } from '../client'
 import type { ManagedService } from '../orchester'
 import { Dashboard } from './Dashboard'
+import { Account } from './Account'
 import { ServiceActions } from './ServiceActions'
 import { Configure } from './Configure'
+import { Wizard } from './Wizard'
 import { StatusBar, type Shortcut } from './StatusBar'
 import { Spinner } from './Spinner'
 
@@ -15,6 +17,8 @@ type Screen =
   | { name: 'dashboard' }
   | { name: 'actions'; serviceId: string }
   | { name: 'configure'; serviceId: string }
+  | { name: 'account' }
+  | { name: 'wizard' }
 
 export function App() {
   const { exit } = useApp()
@@ -47,11 +51,17 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Global quit on Ctrl+C / q at the root.
+  // Global quit on Ctrl+C / q at the root; A opens the account screen.
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
       client?.close()
       exit()
+    }
+    if (input === 'a' && stack[stack.length - 1]?.name === 'dashboard') {
+      setStack((st) => [...st, { name: 'account' }])
+    }
+    if (input === 'd' && stack[stack.length - 1]?.name === 'dashboard') {
+      setStack((st) => [...st, { name: 'wizard' }])
     }
   })
 
@@ -89,7 +99,11 @@ export function App() {
 
   const shortcuts: Shortcut[] =
     screen.name === 'dashboard'
-      ? [{ key: '↑↓', label: 'select' }, { key: '↵', label: 'open' }, { key: 'Space', label: 'start/stop' }, { key: 'Q', label: 'quit' }]
+      ? [{ key: '↑↓', label: 'select' }, { key: '↵', label: 'open' }, { key: 'Space', label: 'start/stop' }, { key: 'A', label: 'account' }, { key: 'D', label: 'deploy' }, { key: 'Q', label: 'quit' }]
+      : screen.name === 'account'
+        ? [{ key: '↑↓', label: 'move' }, { key: '↵', label: 'select' }, { key: 'Esc', label: 'back' }]
+      : screen.name === 'wizard'
+        ? [{ key: '↑↓', label: 'step' }, { key: '↵', label: 'apply' }, { key: 'E', label: 'edit' }, { key: 'R', label: 're-check' }, { key: 'Esc', label: 'back' }]
       : screen.name === 'actions'
         ? [{ key: '←→', label: 'choose' }, { key: '↵', label: 'run' }, { key: 'C', label: 'copy log' }, { key: 'Esc', label: 'back' }]
         : [{ key: '↑↓', label: 'field' }, { key: '↵', label: 'save' }, { key: 'Esc', label: 'cancel' }]
@@ -107,6 +121,14 @@ export function App() {
           onToggle={toggle}
           onQuit={quit}
         />
+      )}
+
+      {screen.name === 'account' && (
+        <Account client={client} onFlash={flash} onBack={pop} />
+      )}
+
+      {screen.name === 'wizard' && (
+        <Wizard onFlash={flash} onBack={pop} />
       )}
 
       {screen.name === 'actions' && (

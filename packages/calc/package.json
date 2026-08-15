@@ -1,0 +1,26 @@
+{
+  "name": "@muralink/calc",
+  "version": "0.1.0",
+  "description": "Deterministic spreadsheet/formula engine — pure parser + evaluator + dependency graph. Zero-dependency core (a JS sandbox for user-defined functions is added in a subpath). Runs identically on web and server. The engine behind the calcsheet module and, later, the generic table.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sandbox": "./src/sandbox/index.ts",
+    "./blocks": "./src/blocks/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "verify": "tsx verify.ts",
+    "verify:sandbox": "tsx verify-sandbox.ts"
+  },
+  "dependencies": {
+    "quickjs-emscripten": "0.32.0"
+  },
+  "license": "MIT"
+}

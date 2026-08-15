@@ -2,25 +2,29 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { MarkdownEditor } from '@muralink/module-notes/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ShellApp, Dock, type CellContext, type ModuleDescriptor, type CellMethod, type CellTab, type OnClickBinding } from '@muralink/shell'
-import type { GridCellRecord, GridSize } from '@muralink/types'
-import { AppShell, localStorageAdapter, sizeSpan, type CellMenuItem } from '@muralink/ui'
+import { ShellApp, type CellContext, type ModuleDescriptor, type ModuleVariant, type CellMethod, type CellTab, type OnClickBinding, type GridLayoutHandle } from '@muralink/shell'
+import type { GridCellPosition, GridCellRecord, GridSize, LayoutConstraints } from '@muralink/types'
+import { localStorageAdapter, makeCloudLayoutAdapter, makeVaultSync, sizeSpan, type CellMenuItem } from '@muralink/ui'
+import { setAmbientSpace, type SpaceId } from '@muralink/spaces'
 import { PublicBooking } from './pages/PublicBooking.tsx'
 import { buildWebRegistry } from './registry.tsx'
-import { makeWebDockItems } from './dockItems.tsx'
+import { pinnedDockItems } from './pinnedDockItems.tsx'
 import { defaultLayout, WEB_LAYOUT_ID } from './defaultLayout.ts'
 import { useView, DASHBOARD } from './viewStore.ts'
 import { AppPanel } from './modals.tsx'
 import { WebAddElementModal } from './WebAddElementModal.tsx'
+import type { OmnibarContext } from '@muralink/omnibar'
 import { WidgetConfigModal } from './WidgetConfigModal.tsx'
 import { makeOnClickTab } from './widgetTabs/OnClickTab.tsx'
 import { makeSizeTab } from './widgetTabs/SizeTab.tsx'
 import { type AppEnv, AppEnvProvider, defaultEnv } from './env.ts'
 import { configureApi } from './api/client.ts'
+import { ChatBubble } from './chat/ChatBubble.tsx'
 // Design tokens (CSS variables) must load before everything that reads them.
 import './styles/tokens.css'
 import './styles/module-views.css'
 import './styles/base.css'
+import './styles/chat.css'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
@@ -29,7 +33,16 @@ const queryClient = new QueryClient({
 interface Crumb {
   id: string
   title: string
+  // Effective storage space for items created while in this dashboard. Resolved
+  // on navigation: a sub-dashboard inherits its parent unless its cell overrides
+  // it (cell.props.storageSpace). Root baseline is 'local'.
+  space: SpaceId
 }
+
+// A dashboard cell's storage setting, stored on cell.props.storageSpace.
+// 'inherit' (or absent) = cascade from the parent dashboard.
+type StorageChoice = SpaceId | 'inherit'
+const ROOT_SPACE: SpaceId = 'local'
 
 function WebShell({ env }: { env: AppEnv }) {
   const registry = useMemo(() => buildWebRegistry(), [])
@@ -37,11 +50,14 @@ function WebShell({ env }: { env: AppEnv }) {
   const instanceId = useView((s) => s.instanceId)
   const setView = useView((s) => s.setView)
 
-  const [editMode, setEditMode] = useState(false)
+  // Focus/outfocus model (replaces the deprecated global edit mode): the one
+  // focused cell is interactive + shows move/resize chrome; all others read-only.
+  const [focusedCellId, setFocusedCellId] = useState<string | null>(null)
   // A pending add: position (col,row) plus optional marquee-defined span (cols,rows).
-  const [addSlot, setAddSlot] = useState<{ col: number; row: number; cols?: number; rows?: number } | null>(null)
+  // `context` carries where the omnibar was invoked from (selection, grid slot…).
+  const [addSlot, setAddSlot] = useState<{ col: number; row: number; cols?: number; rows?: number; context?: OmnibarContext } | null>(null)
   // Recursive dashboards: a stack of nested grids. The last entry is the one shown.
-  const [stack, setStack] = useState<Crumb[]>([{ id: WEB_LAYOUT_ID, title: 'Inicio' }])
+  const [stack, setStack] = useState<Crumb[]>([{ id: WEB_LAYOUT_ID, title: 'Inicio', space: ROOT_SPACE }])
   // The text cell whose full-screen editor overlay is open, if any.
   const [editTextCell, setEditTextCell] = useState<string | null>(null)
   // The widget-config modal target (cell + optional starting tab), if open.
@@ -49,12 +65,42 @@ function WebShell({ env }: { env: AppEnv }) {
   // Bumped on every cell mutation so views reading the layout ref re-render.
   const [, setTick] = useState(0)
 
-  const current = stack[stack.length - 1] ?? { id: WEB_LAYOUT_ID, title: 'Inicio' }
+  const current = stack[stack.length - 1] ?? { id: WEB_LAYOUT_ID, title: 'Inicio', space: ROOT_SPACE }
 
-  const layoutRef = useRef<{
-    cells: GridCellRecord[]
-    applyCells: (cells: GridCellRecord[]) => void
-  } | null>(null)
+  // Route new items to the active dashboard's effective space (cascade). Reads
+  // still merge every active space; this only steers where new items are created.
+  useEffect(() => {
+    setAmbientSpace(current.space)
+  }, [current.space])
+
+  // A vault subtree (layoutId prefixed `vault:`) persists its grid to the account
+  // cloud core instead of localStorage, so it converges across devices. The cloud
+  // adapter is built once from the app env (base URL + account token). Realtime
+  // push (useVaultSync) is wired into `subscribe` in a later step; until then the
+  // vault still syncs pull-wise on open.
+  // One WebSocket to /ws/vault backs all vault subtrees; its `subscribe` feeds the
+  // adapter so a change on another device refetches here in realtime. Reconnect
+  // triggers a full resync. Closed on unmount.
+  const vaultSync = useMemo(
+    () => makeVaultSync({ baseUrl: env.apiBaseUrl, token: env.apiToken }),
+    [env.apiBaseUrl, env.apiToken],
+  )
+  useEffect(() => () => vaultSync.close(), [vaultSync])
+  const cloudLayoutAdapter = useMemo(
+    () => makeCloudLayoutAdapter({ baseUrl: env.apiBaseUrl, token: env.apiToken, subscribe: vaultSync.subscribe }),
+    [env.apiBaseUrl, env.apiToken, vaultSync],
+  )
+  const isVault = current.id.startsWith('vault:')
+
+  const layoutRef = useRef<GridLayoutHandle | null>(null)
+
+  // Module-level layout constraints, fed to the auto layout so the grid can act
+  // as a window manager (a "tall" calendar stays tall, etc.).
+  const resolveConstraints = useMemo(
+    () => (cell: GridCellRecord): LayoutConstraints | undefined =>
+      registry.getConstraints(cell.moduleId),
+    [registry],
+  )
 
   function updateCell(cellId: string, patch: Partial<GridCellRecord>) {
     const cur = layoutRef.current
@@ -71,10 +117,29 @@ function WebShell({ env }: { env: AppEnv }) {
     setTick((t) => t + 1)
   }
 
+  // Global open shortcut (Cmd/Ctrl+K): snapshot the current text selection and
+  // open the omnibar seeded with it — select text in a note → ⌘K → "tr" translates.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.key === 'k' && (e.metaKey || e.ctrlKey))) return
+      if (view !== DASHBOARD) return
+      e.preventDefault()
+      const text = window.getSelection()?.toString().trim() || undefined
+      setAddSlot({
+        col: 0,
+        row: 0,
+        context: { source: text ? 'selection' : 'none', text },
+      })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [view])
+
   function handleRemove(cellId: string) {
     const cur = layoutRef.current
     if (!cur) return
-    cur.applyCells(cur.cells.filter((c) => c.id !== cellId))
+    // Semantic delete: compacts the hole in auto mode, plain remove in freeform.
+    cur.deleteCell(cellId)
     setConfigTarget((t) => (t?.cellId === cellId ? null : t))
     setTick((t) => t + 1)
   }
@@ -91,30 +156,42 @@ function WebShell({ env }: { env: AppEnv }) {
       layoutId: current.id,
       navigateTo: (id: string, title?: string) => {
         setAddSlot(null)
-        setStack((s) => [...s, { id, title: title || 'Dashboard' }])
+        setFocusedCellId(null)
+        // Resolve the child dashboard's effective space: its own setting if it
+        // overrides, else inherit the parent's (cascade).
+        const childId = id.split('/').pop()
+        const choice = layoutRef.current?.cells.find((c) => c.id === childId)
+          ?.props?.storageSpace as StorageChoice | undefined
+        const space: SpaceId = choice && choice !== 'inherit' ? choice : current.space
+        setStack((s) => [...s, { id, title: title || 'Dashboard', space }])
       },
       updateCell,
       openTextEditor: (cellId: string) => setEditTextCell(cellId),
+      focusCell: (cellId: string) => {
+        setFocusedCellId(cellId)
+        document.querySelector(`[data-cell-id="${cellId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      },
     }),
     [setView, current.id],
   )
 
-  const dockItems = makeWebDockItems({
-    activeView: view,
-    setView,
-    editMode,
-    onToggleEdit: () => setEditMode((v) => !v),
-    hasOrchester: env.hasOrchester,
-  })
+  const dockItems = [
+    ...pinnedDockItems(layoutRef.current?.cells ?? [], registry, ctx, focusedCellId ?? undefined),
+    ...(env.dockItems ?? []),
+  ]
 
   function renderCell(cell: GridCellRecord, isDragging: boolean) {
-    return registry.render(cell, ctx, isDragging)
+    // Per-cell ctx: only the focused cell is interactive; others render read-only.
+    return registry.render(cell, { ...ctx, focused: cell.id === focusedCellId }, isDragging)
   }
 
-  function handleResize(cellId: string, size: GridSize) {
+  function handleResize(cellId: string, size: GridSize, position?: GridCellPosition) {
     const cur = layoutRef.current
     if (!cur) return
-    cur.applyCells(cur.cells.map((c) => (c.id === cellId ? { ...c, size } : c)))
+    // Semantic resize: grow now displaces neighbors (freeform) or reflows all (auto)
+    // instead of silently overlapping. `position` moves the origin when a top/left
+    // handle was dragged.
+    cur.resizeCell(cellId, size, position)
   }
 
   // Marquee-defined span wins; otherwise fall back to the descriptor's default.
@@ -127,18 +204,21 @@ function WebShell({ env }: { env: AppEnv }) {
     return `cell-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
   }
 
-  function handlePick(descriptor: ModuleDescriptor) {
+  function handlePick(descriptor: ModuleDescriptor, variant?: ModuleVariant) {
     const cur = layoutRef.current
     if (!cur || !addSlot) return
-    const size = slotSize(descriptor.defaultSize)
+    const size = slotSize(variant?.defaultSize ?? descriptor.defaultSize)
     const newCell: GridCellRecord = {
       id: newCellId(),
       moduleId: descriptor.moduleId,
       viewSpecId: `${descriptor.moduleId}/${size}`,
       size,
       position: { col: addSlot.col, row: addSlot.row },
+      props: variant?.defaultProps ? { ...variant.defaultProps } : undefined,
     }
-    cur.applyCells([...cur.cells, newCell])
+    // Semantic insert: auto-places + reflows in auto mode, displaces overlaps in
+    // freeform (no more stacking a new widget on top of an existing one).
+    cur.insertCell(newCell)
     setAddSlot(null)
   }
 
@@ -155,15 +235,15 @@ function WebShell({ env }: { env: AppEnv }) {
       position: { col: addSlot.col, row: addSlot.row },
       props: { text },
     }
-    cur.applyCells([...cur.cells, newCell])
+    cur.insertCell(newCell)
     setAddSlot(null)
   }
 
-  // Is a module method available on this cell right now (size + mode gates)?
+  // Is a module method available on this cell right now (size gate)? The mode
+  // gate is dropped with edit-mode deprecation — the ⋯ menu only renders on the
+  // focused cell, which is the interactive context.
   function isMethodVisible(m: CellMethod, cell: GridCellRecord): boolean {
     const v = m.visibility
-    const mode = v?.mode ?? 'edit'
-    if (mode !== 'both' && mode !== (editMode ? 'edit' : 'view')) return false
     const span = sizeSpan(cell.size)
     if (v?.match && !v.match(span)) return false
     if (v?.minSizes && !v.minSizes.some((s) => {
@@ -178,6 +258,13 @@ function WebShell({ env }: { env: AppEnv }) {
     const items: CellMenuItem[] = [
       { id: 'grid.size', label: 'Tamaño…', icon: '⤢', group: 'grid', onSelect: () => openConfigTab(cell.id, 'size') },
       { id: 'grid.onclick', label: 'On click…', icon: '👆', group: 'grid', onSelect: () => openConfigTab(cell.id, 'onClick') },
+      {
+        id: 'grid.pin',
+        label: cell.pinned ? 'Desanclar del dock' : 'Anclar al dock',
+        icon: '📌',
+        group: 'grid',
+        onSelect: () => updateCell(cell.id, { pinned: !cell.pinned }),
+      },
       { id: 'grid.remove', label: 'Eliminar', icon: '🗑', group: 'grid', danger: true, onSelect: () => handleRemove(cell.id) },
     ]
     for (const m of registry.getMethods(cell.moduleId)) {
@@ -189,6 +276,23 @@ function WebShell({ env }: { env: AppEnv }) {
         group: 'module',
         onSelect: () => (m.tab ? openConfigTab(cell.id, m.tab.id) : m.run?.(cell, ctx)),
       })
+    }
+    // Sub-dashboards carry a storage setting that cascades to everything created
+    // inside them (and their own sub-dashboards). 'inherit' follows the parent.
+    if (cell.moduleId === 'dashboard') {
+      const choice = (cell.props?.storageSpace as StorageChoice | undefined) ?? 'inherit'
+      const opt = (id: StorageChoice, label: string, icon: string): CellMenuItem => ({
+        id: `store.${id}`,
+        label: (choice === id ? '● ' : '') + label,
+        icon,
+        group: 'module',
+        onSelect: () => updateCell(cell.id, { props: { storageSpace: id } }),
+      })
+      items.push(
+        opt('inherit', 'Guardar: heredar', '⤴'),
+        opt('local', 'Guardar: local', '💾'),
+        opt('orchester', 'Guardar: nube', '☁'),
+      )
     }
     return items
   }
@@ -233,36 +337,32 @@ function WebShell({ env }: { env: AppEnv }) {
 
   const configCell = configTarget ? layoutRef.current?.cells.find((c) => c.id === configTarget.cellId) : undefined
 
-  // An app view fills the main content area; the dock stays visible alongside it.
-  if (view !== DASHBOARD) {
-    return (
-      <div style={{ height: '100vh' }}>
-        <AppShell sidebar={<Dock items={dockItems} />}>
-          <AppPanel viewId={view} instanceId={instanceId} onBack={() => setView(DASHBOARD)} />
-        </AppShell>
-      </div>
-    )
-  }
-
-  // Dashboard: the bento grid (dock + grid via ShellApp). Keyed by the active
-  // layoutId so descending into a sub-dashboard remounts and reloads its cells.
+  // The dashboard grid is always mounted — opening an app (Mail, Cuentas, a
+  // CRUD page, …) no longer navigates away from it. When view !== DASHBOARD,
+  // AppPanel renders as a full-screen overlay on top instead of replacing the
+  // grid, so every cell's existing "expand" affordance (ctx.openModal = setView)
+  // keeps working unchanged — it now opens over the grid rather than instead of it.
   return (
     <div style={{ height: '100vh', position: 'relative' }}>
+      {/* Dashboard: the bento grid (dock + grid via ShellApp). Keyed by the active
+          layoutId so descending into a sub-dashboard remounts and reloads its cells. */}
       <ShellApp
         key={current.id}
         dockItems={dockItems}
         layoutId={current.id}
         initialConfig={current.id === WEB_LAYOUT_ID ? defaultLayout : undefined}
         platform="web"
-        persistenceAdapter={localStorageAdapter}
+        persistenceAdapter={isVault ? cloudLayoutAdapter : localStorageAdapter}
         renderCell={renderCell}
-        editMode={editMode}
-        onEnterEditMode={() => setEditMode(true)}
+        focusMode
+        focusedCellId={focusedCellId}
+        onFocusCell={setFocusedCellId}
         onCellResize={handleResize}
         onCellEditClick={(cellId) => openConfigTab(cellId)}
-        onAddElement={(col, row, cols, rows) => setAddSlot({ col, row, cols, rows })}
+        onAddElement={(col, row, cols, rows) => setAddSlot({ col, row, cols, rows, context: { source: 'slot' } })}
         getCellMenu={getCellMenu}
         resolveCellClick={resolveCellClick}
+        resolveConstraints={resolveConstraints}
         layoutRef={layoutRef}
       />
 
@@ -276,6 +376,7 @@ function WebShell({ env }: { env: AppEnv }) {
           onPick={handlePick}
           onCreateNote={handleCreateNote}
           onClose={() => setAddSlot(null)}
+          context={addSlot.context}
         />
       )}
 
@@ -297,6 +398,12 @@ function WebShell({ env }: { env: AppEnv }) {
           onRemove={() => handleRemove(configCell.id)}
           onClose={() => setConfigTarget(null)}
         />
+      )}
+
+      {view !== DASHBOARD && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 400, background: 'var(--bg)' }}>
+          <AppPanel viewId={view} instanceId={instanceId} onBack={() => setView(DASHBOARD)} />
+        </div>
       )}
     </div>
   )
@@ -423,8 +530,18 @@ export function App({ env = defaultEnv }: { env?: AppEnv }) {
           <Routes>
             {/* Public — no shell */}
             <Route path="/book" element={<PublicBooking />} />
-            {/* App — bento shell */}
-            <Route path="/*" element={<WebShell env={env} />} />
+            {/* App — bento shell. ChatBubble portals to <body>, so mounting it
+                on this route (and not on /book) covers dashboard + app views
+                while keeping the public page clean. */}
+            <Route
+              path="/*"
+              element={
+                <>
+                  <WebShell env={env} />
+                  <ChatBubble />
+                </>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>

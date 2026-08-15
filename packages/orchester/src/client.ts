@@ -132,8 +132,30 @@ export class OrchesterClient {
     return this.#call('accountLogin', { ...params }) as Promise<AccountStatus>
   }
 
+  // OTP link: redeem a one-time code minted from a signed-in session on the
+  // mother (the cloud frontend) — no password ever typed on this machine.
+  accountLoginOtp(params: { tunnelBaseUrl: string; code: string; label?: string }): Promise<AccountStatus> {
+    return this.#call('accountLoginOtp', { ...params }) as Promise<AccountStatus>
+  }
+
   accountLogout(): Promise<AccountStatus> {
     return this.#call('accountLogout') as Promise<AccountStatus>
+  }
+
+  // Share a local folder through the tunnel; resolves with the guest URL.
+  tunnelShare(params: {
+    rootPath: string
+    pathLabel?: string
+    role?: 'viewer' | 'editor' | 'admin'
+    password?: string
+    targetEmail?: string | null
+    expiresAt?: string | null
+  }): Promise<{ url: string; tunnelShareId: string }> {
+    return this.#call('tunnelShare', { ...params }) as Promise<{ url: string; tunnelShareId: string }>
+  }
+
+  tunnelShares(): Promise<{ pathLabel: string; rootPath: string; role: string; url?: string }[]> {
+    return this.#call('tunnelShares') as Promise<{ pathLabel: string; rootPath: string; role: string; url?: string }[]>
   }
 
   // Subscribe to live status-change events. Returns an unsubscribe fn.

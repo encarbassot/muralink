@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ShellApp, CellRegistry, type CellContext, type ModuleDescriptor } from '@muralink/shell'
-import type { GridCellRecord, GridSize } from '@muralink/types'
+import { ShellApp, CellRegistry, type CellContext, type ModuleDescriptor, type GridLayoutHandle } from '@muralink/shell'
+import type { GridCellPosition, GridCellRecord, GridSize } from '@muralink/types'
 import { usePlatform } from '@/stores/platformStore'
 import { useDock } from '@/stores/dockStore'
 import { useLayoutStore } from '@/stores/layoutStore'
@@ -38,10 +38,7 @@ export function DashboardApp() {
   const [configCellId, setConfigCellId] = useState<string | null>(null)
   const [addSlot, setAddSlot] = useState<{ col: number; row: number } | null>(null)
 
-  const layoutRef = useRef<{
-    cells: GridCellRecord[]
-    applyCells: (cells: GridCellRecord[]) => void
-  } | null>(null)
+  const layoutRef = useRef<GridLayoutHandle | null>(null)
 
   const isAtRoot = navigationStack.length <= 1
   const layouts = useLayoutStore((s) => s.layouts)
@@ -100,6 +97,13 @@ export function DashboardApp() {
           },
           {
             type: 'button' as const,
+            id: 'local-device',
+            icon: <span style={{ fontSize: 14, lineHeight: 1 }}>💾</span>,
+            label: 'Este dispositivo',
+            onClick: () => openApp('local-device'),
+          },
+          {
+            type: 'button' as const,
             id: 'orchester',
             icon: <span style={{ fontSize: 14, lineHeight: 1 }}>🎛</span>,
             label: 'Orchester',
@@ -150,11 +154,11 @@ export function DashboardApp() {
     ? layoutRef.current?.cells.find((c) => c.id === configCellId) ?? null
     : null
 
-  function handleResize(cellId: string, size: GridSize) {
+  function handleResize(cellId: string, size: GridSize, position?: GridCellPosition) {
     const current = layoutRef.current
     if (!current) return
     current.applyCells(
-      current.cells.map((c) => (c.id === cellId ? { ...c, size } : c)),
+      current.cells.map((c) => (c.id === cellId ? { ...c, size, position: position ?? c.position } : c)),
     )
   }
 
@@ -164,8 +168,8 @@ export function DashboardApp() {
     current.applyCells(current.cells.filter((c) => c.id !== cellId))
   }
 
-  function handleCellResize(cellId: string, size: GridSize) {
-    handleResize(cellId, size)
+  function handleCellResize(cellId: string, size: GridSize, position?: GridCellPosition) {
+    handleResize(cellId, size, position)
   }
 
   function handleAddElement(descriptor: ModuleDescriptor, col: number, row: number) {

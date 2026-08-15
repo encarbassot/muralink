@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DayView, registerProvider, makeApiProvider } from '@muralink/module-calendar/web'
+import { WeekApp, registerProvider, makeApiProvider } from '@muralink/module-calendar/web'
 import { API_ORIGIN, API_TOKEN } from '../api/client.ts'
 
 // The calendar is self-contained (its own unified multi-target store). The app's
@@ -20,10 +20,11 @@ export function Calendar() {
   }, [])
 
   if (!ready) return null
-  return <DayView />
+  // The week is the main screen — mobile-format 7-column grid.
+  return <WeekApp />
 }
 
-// Bento cell variant reuses the same day surface at grid scale.
+// Bento cell variant reuses the same week surface at grid scale.
 export function CalendarGridCell() {
   return <Calendar />
 }

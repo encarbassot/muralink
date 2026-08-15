@@ -4,7 +4,7 @@ export const manifest: ModuleManifest = {
   id: 'calendar',
   version: '0.0.0',
   dependencies: [],
-  types: ['YCalendarEvent', 'YAvailabilitySlot'],
+  types: ['YCalendarEvent', 'YAvailabilitySlot', 'YAppointment', 'YService', 'YAvailableSlot'],
   views: [
     {
       id: 'calendar-widget',
@@ -19,10 +19,28 @@ export const manifest: ModuleManifest = {
       component: './implementations/web/views/WeekView',
     },
     {
+      id: 'calendar-week-mobile',
+      platforms: ['web'],
+      sizes: ['2x3', '3x3'],
+      component: './implementations/web/views/WeekApp',
+    },
+    {
       id: 'calendar-day-strip',
       platforms: ['web'],
       sizes: ['1x2'],
       component: './implementations/web/views/DayStrip',
+    },
+    {
+      id: 'appointments-list',
+      platforms: ['web'],
+      sizes: ['2x2'],
+      component: './implementations/web/views/AppointmentList',
+    },
+    {
+      id: 'booking-widget',
+      platforms: ['web'],
+      sizes: ['1x2'],
+      component: './implementations/web/views/BookingWidget',
     },
   ],
   platforms: ['web', 'electron', 'extension', 'local-server'],

@@ -5,6 +5,8 @@ interface Props {
   items?: YStockItem[]
   onItemClick?: (item: YStockItem) => void
   onAdjust?: (id: string, delta: number) => void
+  /** Read-only (outfocus): hide the search box; +/- are already gated on onAdjust. */
+  readOnly?: boolean
 }
 
 function formatPrice(item: YStockItem): string {
@@ -17,7 +19,7 @@ function isLow(item: YStockItem): boolean {
   return item.lowStockThreshold != null && item.quantity <= item.lowStockThreshold
 }
 
-export function StockList({ items = [], onItemClick, onAdjust }: Props) {
+export function StockList({ items = [], onItemClick, onAdjust, readOnly = false }: Props) {
   const [search, setSearch] = useState('')
   const filtered = items.filter(i =>
     i.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -26,18 +28,20 @@ export function StockList({ items = [], onItemClick, onAdjust }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', fontFamily: 'inherit' }}>
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border, #d4cfc9)' }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar producto..."
-          style={{
-            width: '100%', border: '1px solid var(--border, #d4cfc9)', borderRadius: 6,
-            padding: '6px 10px', fontSize: 13, outline: 'none',
-            background: 'var(--background, #f9f7f4)', boxSizing: 'border-box',
-          }}
-        />
-      </div>
+      {!readOnly && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border, #d4cfc9)' }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar producto..."
+            style={{
+              width: '100%', border: '1px solid var(--border, #d4cfc9)', borderRadius: 6,
+              padding: '6px 10px', fontSize: 13, outline: 'none',
+              background: 'var(--background, #f9f7f4)', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      )}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 16, color: 'var(--muted-foreground, #6b6560)', fontSize: 13 }}>Sin productos</div>

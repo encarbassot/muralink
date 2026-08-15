@@ -8,9 +8,20 @@ import {
   localStorageAdapter,
 } from '@muralink/ui'
 import type { CellMenuItem } from '@muralink/ui'
-import type { GridCellRecord, GridLayoutConfig, Platform } from '@muralink/types'
+import type { GridCellPosition, GridCellRecord, GridLayoutConfig, GridSize, LayoutConstraints, LayoutMode, Platform } from '@muralink/types'
 import type { ShellAppProps } from './types.js'
 import { Dock } from './Dock.js'
+
+/** Imperative handle the platform gets over the live grid. Semantic mutators
+ *  (insert/delete/resize) run auto-placement + reflow per the active layoutMode. */
+export interface GridLayoutHandle {
+  cells: GridCellRecord[]
+  layoutMode: LayoutMode
+  applyCells: (cells: GridCellRecord[]) => void
+  insertCell: (cell: GridCellRecord) => void
+  deleteCell: (cellId: string) => void
+  resizeCell: (cellId: string, size: GridSize, position?: GridCellPosition) => void
+}
 
 function makeDefaultLayout(layoutId: string, platform: Platform): GridLayoutConfig {
   return {
@@ -35,17 +46,24 @@ interface Props extends ShellAppProps {
   /** Called when a cell's pencil config button is clicked. */
   onCellEditClick?: (cellId: string) => void
   /** Called when corner resize handle commits a new size. */
-  onCellResize?: (cellId: string, newSize: import('@muralink/types').GridSize) => void
+  onCellResize?: (
+    cellId: string,
+    newSize: import('@muralink/types').GridSize,
+    newPosition?: import('@muralink/types').GridCellPosition,
+  ) => void
   /** Called to add an element: (col,row) for a click, (col,row,cols,rows) for a marquee drag. */
   onAddElement?: (col: number, row: number, cols?: number, rows?: number) => void
   /** Header ⋯ menu items for a cell (grid options + module methods). */
   getCellMenu?: (cell: GridCellRecord) => CellMenuItem[]
   /** Resolves a cell's configured view-mode click action. undefined = not clickable. */
   resolveCellClick?: (cell: GridCellRecord) => (() => void) | undefined
-  layoutRef?: React.MutableRefObject<{
-    cells: GridCellRecord[]
-    applyCells: (cells: GridCellRecord[]) => void
-  } | null>
+  /** Module-level layout constraints resolver. Consumed by the auto layout. */
+  resolveConstraints?: (cell: GridCellRecord) => LayoutConstraints | undefined
+  /** Focus/outfocus model (opt-in) — passed straight through to GridCanvas. */
+  focusMode?: boolean
+  focusedCellId?: string | null
+  onFocusCell?: (id: string | null) => void
+  layoutRef?: React.MutableRefObject<GridLayoutHandle | null>
 }
 
 export function ShellApp({
@@ -63,6 +81,10 @@ export function ShellApp({
   onAddElement,
   getCellMenu,
   resolveCellClick,
+  resolveConstraints,
+  focusMode,
+  focusedCellId,
+  onFocusCell,
   layoutRef,
 }: Props) {
   const [showConfig, setShowConfig] = useState(false)
@@ -74,14 +96,14 @@ export function ShellApp({
     platform: (initialConfig?.platform ?? platform),
   }
 
-  const { layout, applyCells, updateConfig } = useGridLayout(
-    defaultLayout,
-    persistenceAdapter ?? localStorageAdapter,
-  )
+  const { layout, applyCells, updateConfig, insertCell, deleteCell, resizeCell, layoutMode } =
+    useGridLayout(defaultLayout, persistenceAdapter ?? localStorageAdapter, resolveConstraints)
 
   // Keep layoutRef in sync so callers can read/write cells from outside
   useEffect(() => {
-    if (layoutRef) layoutRef.current = { cells: layout.cells, applyCells }
+    if (layoutRef) {
+      layoutRef.current = { cells: layout.cells, layoutMode, applyCells, insertCell, deleteCell, resizeCell }
+    }
   })
 
   const configButton = {
@@ -131,6 +153,9 @@ export function ShellApp({
           onAddElement={onAddElement}
           getCellMenu={getCellMenu}
           resolveCellClick={resolveCellClick}
+          focusMode={focusMode}
+          focusedCellId={focusedCellId}
+          onFocusCell={onFocusCell}
         />
       </div>
     </AppShell>

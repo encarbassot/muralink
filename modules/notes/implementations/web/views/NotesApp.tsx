@@ -1,107 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { EditorView } from '@codemirror/view'
-import { EditorSelection } from '@codemirror/state'
 import { listSpaces } from '@muralink/spaces'
-import { MarkdownEditor } from '../editor/index.ts'
+import { MarkdownEditor } from '@muralink/editor'
 import { useNotes } from '../notesStore.ts'
-
-// ── Editor command helpers (operate on the live EditorView) ──────────────────
-
-function wrapSelection(view: EditorView, token: string) {
-  const tx = view.state.changeByRange((range) => {
-    const selected = view.state.doc.sliceString(range.from, range.to)
-    const insert = `${token}${selected}${token}`
-    return {
-      changes: { from: range.from, to: range.to, insert },
-      range: EditorSelection.range(range.from + token.length, range.from + token.length + selected.length),
-    }
-  })
-  view.dispatch(view.state.update(tx, { scrollIntoView: true, userEvent: 'input' }))
-  view.focus()
-}
-
-function prefixLines(view: EditorView, prefix: string) {
-  const { state } = view
-  const changes = []
-  const seen = new Set<number>()
-  for (const range of state.selection.ranges) {
-    let pos = range.from
-    while (pos <= range.to) {
-      const line = state.doc.lineAt(pos)
-      if (!seen.has(line.number)) {
-        seen.add(line.number)
-        changes.push({ from: line.from, insert: prefix })
-      }
-      if (line.to >= range.to) break
-      pos = line.to + 1
-    }
-  }
-  view.dispatch({ changes })
-  view.focus()
-}
-
-// ── Toolbar ──────────────────────────────────────────────────────────────────
-
-function Toolbar({
-  editorRef,
-  rich,
-  onToggleRich,
-}: {
-  editorRef: React.MutableRefObject<EditorView | null>
-  rich: boolean
-  onToggleRich: () => void
-}) {
-  const run = (fn: (v: EditorView) => void) => () => {
-    const v = editorRef.current
-    if (v) fn(v)
-  }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderBottom: '1px solid var(--border)' }}>
-      <TBtn title="Bold" onClick={run((v) => wrapSelection(v, '**'))}><strong>B</strong></TBtn>
-      <TBtn title="Italic" onClick={run((v) => wrapSelection(v, '*'))}><em>I</em></TBtn>
-      <TBtn title="Code" onClick={run((v) => wrapSelection(v, '`'))}>{'</>'}</TBtn>
-      <TBtn title="Bullet list" onClick={run((v) => prefixLines(v, '- '))}>•</TBtn>
-      <TBtn title="Heading" onClick={run((v) => prefixLines(v, '# '))}>H</TBtn>
-      <div style={{ flex: 1 }} />
-      <TBtn title={rich ? 'Hide markdown syntax' : 'Show markdown syntax'} onClick={onToggleRich} active={rich}>
-        {rich ? '⟨⟩' : '¶'}
-      </TBtn>
-    </div>
-  )
-}
-
-function TBtn({
-  children,
-  onClick,
-  title,
-  active,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  title?: string
-  active?: boolean
-}) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      style={{
-        minWidth: 26,
-        height: 24,
-        padding: '0 6px',
-        borderRadius: 6,
-        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-        background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg)',
-        color: active ? 'var(--accent)' : 'var(--fg-dim)',
-        cursor: 'pointer',
-        fontSize: 11,
-        lineHeight: 1,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
 
 // ── App ──────────────────────────────────────────────────────────────────────
 
@@ -122,8 +22,6 @@ export function NotesApp({ initialNoteId }: Props) {
   const spaces = listSpaces('notes').filter((sp) => !sp.readonly)
 
   const [activeId, setActiveId] = useState<string | undefined>(initialNoteId)
-  const [rich, setRich] = useState(true)
-  const editorRef = useRef<EditorView | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Guards the one-shot auto-create so React strict-mode double effect runs
   // (and re-renders while the async create is in flight) don't spawn extras.
@@ -132,6 +30,11 @@ export function NotesApp({ initialNoteId }: Props) {
   useEffect(() => {
     if (!loaded) void loadAll()
   }, [loaded, loadAll])
+
+  // Follow a new target while already mounted (dock quick action "Nueva nota").
+  useEffect(() => {
+    if (initialNoteId) setActiveId(initialNoteId)
+  }, [initialNoteId])
 
   // Pick a sensible active note once loaded. When the store is empty, create a
   // blank note automatically so the user lands straight in the editor and can
@@ -239,14 +142,12 @@ export function NotesApp({ initialNoteId }: Props) {
                 ✕
               </button>
             </div>
-            <Toolbar editorRef={editorRef} rich={rich} onToggleRich={() => setRich((v) => !v)} />
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <MarkdownEditor
                 key={active.id}
                 value={active.body}
                 onChange={(body) => scheduleSave({ body })}
-                richFormatting={rich}
-                editorRef={editorRef}
+                actionBar="full"
                 placeholder="Start writing…"
                 autoFocus
               />

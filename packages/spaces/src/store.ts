@@ -39,6 +39,22 @@ export function persistPrefs(collection: string, prefs: SpacePrefs): void {
   }
 }
 
+// ── Ambient write-target override ────────────────────────────────────────────
+// The active dashboard can override where NEW items are created (its configured
+// storage space), without changing each collection's persisted default. Reads
+// still merge every active space; only writes for brand-new items are steered.
+// null = fall back to the collection default. Set by the app on navigation.
+
+let ambientSpace: SpaceId | null = null
+
+export function setAmbientSpace(id: SpaceId | null): void {
+  ambientSpace = id
+}
+
+export function getAmbientSpace(): SpaceId | null {
+  return ambientSpace
+}
+
 // A default space must also be active (readable).
 export function withDefault(prefs: SpacePrefs, id: SpaceId): SpacePrefs {
   const activeSpaces = prefs.activeSpaces.includes(id)
@@ -93,7 +109,15 @@ export function spaceFor<T extends SpaceEntity>(
   item: T | undefined,
   defaultSpace: SpaceId,
 ): StorageSpace<T> | undefined {
-  return getSpace<T>(collection, item?.spaceId ?? defaultSpace)
+  // Existing item → its own space (edits stay put). New item → the ambient
+  // override (active dashboard), else the collection default. Falls back to the
+  // default if the ambient space isn't registered for this collection.
+  if (item?.spaceId) return getSpace<T>(collection, item.spaceId)
+  if (ambientSpace) {
+    const s = getSpace<T>(collection, ambientSpace)
+    if (s) return s
+  }
+  return getSpace<T>(collection, defaultSpace)
 }
 
 // Move an item between spaces: recreate it in the destination, drop the

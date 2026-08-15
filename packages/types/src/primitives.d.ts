@@ -30,6 +30,17 @@ export interface YDateTime {
 export interface YDuration {
     seconds: number;
 }
+/** Content block types. A document is an array of blocks, not a string. */
+export type YBlockType = 'paragraph' | 'heading' | 'checkbox';
+/** One element in a vertical block document. Markdown syntax is never stored —
+ * typing `# ` or `- [ ]` in an editor converts the block's type instead. */
+export interface YBlock {
+    id: string;
+    type: YBlockType;
+    text: string;
+    level?: 1 | 2 | 3;
+    checked?: boolean;
+}
 /** A stored credential. Never the plaintext — only the hash + hints. */
 export interface YPassword {
     hash: string;

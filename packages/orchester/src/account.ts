@@ -14,6 +14,30 @@ import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import { paths, ensureHome } from './paths'
 import { TunnelAgent } from './tunnel-agent'
 
+// Pull a fresh signed entitlement from the mother API and cache it for the core
+// to verify. Best-effort by design: on any failure we KEEP the existing cached
+// token — that is the offline grace in action (the token stays valid until its
+// own `exp`). Returns true if a new token was written.
+export async function fetchEntitlement(link: AccountLink): Promise<boolean> {
+  const base = link.tunnelBaseUrl.replace(/\/$/, '')
+  try {
+    const res = await fetch(`${base}/entitlements/current`, {
+      headers: { Authorization: `Bearer ${link.sessionToken}` },
+    })
+    if (!res.ok) return false
+    const body = (await res.json()) as { token?: string }
+    if (!body.token) return false
+    ensureHome()
+    writeFileSync(
+      paths.entitlement,
+      JSON.stringify({ token: body.token, fetchedAt: new Date().toISOString() }, null, 2),
+    )
+    return true
+  } catch {
+    return false // unreachable → keep the cached token (offline grace)
+  }
+}
+
 export interface AccountLink {
   // e.g. http://localhost:4000 — the mother API base.
   tunnelBaseUrl: string
@@ -53,6 +77,11 @@ export function clearAccount(): void {
     unlinkSync(paths.account)
   } catch {
     // already anonymous
+  }
+  try {
+    unlinkSync(paths.entitlement)
+  } catch {
+    // no cached entitlement — fine
   }
 }
 
@@ -98,6 +127,53 @@ export async function linkAccount(params: LinkParams): Promise<AccountLink> {
     linkedAt: new Date().toISOString(),
   }
   saveAccount(link)
+  await fetchEntitlement(link) // best-effort; keeps free-tier default if it fails
+  return link
+}
+
+export interface OtpLinkParams {
+  tunnelBaseUrl: string
+  // One-time code minted by a signed-in session on the mother (device-link).
+  code: string
+  label: string
+}
+
+// Link via OTP: redeem a device-link code (no password ever typed here) for a
+// session token, then register THIS instance. Persists like linkAccount.
+export async function linkAccountWithCode(params: OtpLinkParams): Promise<AccountLink> {
+  const base = params.tunnelBaseUrl.replace(/\/$/, '')
+
+  const redeemRes = await fetch(`${base}/auth/device-link/redeem`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: params.code.trim(), deviceName: `orchester · ${params.label}` }),
+  })
+  if (!redeemRes.ok) {
+    throw new Error(`code rejected: ${redeemRes.status} ${await safeText(redeemRes)}`)
+  }
+  const redeemed = (await redeemRes.json()) as { token: string; user: { email: string } }
+
+  const regRes = await fetch(`${base}/instances/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${redeemed.token}` },
+    body: JSON.stringify({ label: params.label }),
+  })
+  if (!regRes.ok) {
+    throw new Error(`register failed: ${regRes.status} ${await safeText(regRes)}`)
+  }
+  const reg = (await regRes.json()) as { id: string; apiKey: string }
+
+  const link: AccountLink = {
+    tunnelBaseUrl: base,
+    email: redeemed.user.email,
+    sessionToken: redeemed.token,
+    instanceId: reg.id,
+    instanceKey: reg.apiKey,
+    label: params.label,
+    linkedAt: new Date().toISOString(),
+  }
+  saveAccount(link)
+  await fetchEntitlement(link) // best-effort; keeps free-tier default if it fails
   return link
 }
 
@@ -134,9 +210,19 @@ function toWsUrl(baseUrl: string): string {
 // Fase 2; this only maintains presence.
 export class AccountAgent {
   #agent: TunnelAgent | null = null
+  // Periodic entitlement refresh so a plan change / renewal is picked up without
+  // a restart. Offline failures are silently ignored (cached token rides its
+  // grace window). Hourly is well inside the default staleAfter (~24h).
+  #entTimer: ReturnType<typeof setInterval> | null = null
 
   get online(): boolean {
     return this.#agent !== null
+  }
+
+  // The live tunnel agent (null when not linked/connected). Callers use it to
+  // register folder shares over the link (TunnelAgent.shareFolder).
+  get agent(): TunnelAgent | null {
+    return this.#agent
   }
 
   // Reconcile the live link with account.json: connect when linked, drop when not.
@@ -145,6 +231,17 @@ export class AccountAgent {
     if (!link) {
       this.stop()
       return
+    }
+    // Refresh the cached entitlement opportunistically (offline-safe: keeps the
+    // old token on failure). Fire-and-forget — never blocks presence.
+    void fetchEntitlement(link)
+    // Keep it fresh on a timer so renewals/plan changes land without a restart.
+    if (!this.#entTimer) {
+      this.#entTimer = setInterval(() => {
+        const l = loadAccount()
+        if (l) void fetchEntitlement(l)
+      }, 60 * 60 * 1000)
+      if (typeof this.#entTimer.unref === 'function') this.#entTimer.unref()
     }
     if (this.#agent) return // already up
     const agent = new TunnelAgent({
@@ -167,6 +264,10 @@ export class AccountAgent {
   stop(): void {
     this.#agent?.close()
     this.#agent = null
+    if (this.#entTimer) {
+      clearInterval(this.#entTimer)
+      this.#entTimer = null
+    }
   }
 }
 

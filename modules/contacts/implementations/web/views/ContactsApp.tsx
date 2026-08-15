@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
 import { getSpace } from '@muralink/spaces'
+import { PillBar } from '@muralink/ui'
 import type { YContact } from '../../../types.ts'
+import { CONTACT_TODO_PRIVATE, CONTACT_TODO_SHARED, type ContactTodoRole } from '../../../types.ts'
 import type { ContactsAdapter } from '../../../adapter.ts'
 import { useContacts } from '../contactsStore.ts'
+import { usePreparedMessage } from '../preparedStore.ts'
+import { useContactTodos } from '../contactTodos.ts'
+import { ContactsMap } from './ContactsMap.tsx'
+import { LocationSection } from './LocationSection.tsx'
+import { MyLocationsPanel } from './MyLocationsPanel.tsx'
 
 // Standalone, local-first contacts app: master list + editable detail pane.
 // Backed entirely by IndexedDB (via useContacts) so it works offline with no
@@ -27,6 +34,7 @@ export function ContactsApp({ initialContactId }: Props) {
 
   const [activeId, setActiveId] = useState<string | undefined>(initialContactId)
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'list' | 'map' | 'share'>('list')
 
   useEffect(() => {
     if (!loaded) void loadAll()
@@ -37,6 +45,13 @@ export function ContactsApp({ initialContactId }: Props) {
     if (activeId && contacts.some((c) => c.id === activeId)) return
     setActiveId(contacts[0]?.id)
   }, [loaded, contacts, activeId])
+
+  // Ambient signal: the chat assistant reads which ficha is open right now.
+  const setActiveContact = useContacts((s) => s.setActiveContact)
+  useEffect(() => {
+    setActiveContact(activeId)
+    return () => setActiveContact(undefined)
+  }, [activeId, setActiveContact])
 
   const active = contacts.find((c) => c.id === activeId)
 
@@ -62,7 +77,34 @@ export function ContactsApp({ initialContactId }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: 0, background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--bg)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+        <PillBar
+          groups={[
+            {
+              kind: 'radio',
+              value: view,
+              onChange: (id) => setView(id as 'list' | 'map' | 'share'),
+              options: [
+                { id: 'list', label: 'Lista' },
+                { id: 'map', label: 'Mapa', icon: '🗺️' },
+                { id: 'share', label: 'Compartir', icon: '🔗' },
+              ],
+            },
+          ]}
+          align="left"
+        />
+      </div>
+      {view === 'map' ? (
+        <ContactsMap
+          contacts={contacts}
+          selectedId={activeId}
+          onSelect={(id) => { setActiveId(id); setView('list') }}
+        />
+      ) : view === 'share' ? (
+        <MyLocationsPanel />
+      ) : (
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
       {/* Sidebar list */}
       <div style={{ width: 240, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -142,6 +184,8 @@ export function ContactsApp({ initialContactId }: Props) {
           </div>
         )}
       </div>
+      </div>
+      )}
     </div>
   )
 }
@@ -239,6 +283,17 @@ function ContactDetail({
           </div>
         )}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--fg-faint)' }}>Descripción</span>
+          <textarea
+            value={contact.description ?? ''}
+            placeholder="Perfil del contacto (el asistente lo lee y propone actualizaciones)…"
+            disabled={readonly}
+            onChange={(e) => onChange({ description: e.target.value })}
+            rows={4}
+            style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', fontSize: 13, outline: 'none', background: 'var(--bg-elevated)', color: 'var(--fg)', resize: 'vertical', fontFamily: 'inherit', opacity: readonly ? 0.7 : 1 }}
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--fg-faint)' }}>Notas</span>
           <textarea
             value={contact.notes ?? ''}
@@ -249,7 +304,131 @@ function ContactDetail({
             style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', fontSize: 13, outline: 'none', background: 'var(--bg-elevated)', color: 'var(--fg)', resize: 'vertical', fontFamily: 'inherit', opacity: readonly ? 0.7 : 1 }}
           />
         </label>
+        <LocationSection contact={contact} readonly={readonly} onChange={onChange} />
+        {!readonly && <PreparedMessageSection contactId={contact.id} />}
+        {!readonly && <ContactTodosSection contactId={contact.id} />}
       </div>
     </>
+  )
+}
+
+// Always-saved draft message for this contact. Autosaves (debounced) via
+// usePreparedMessage; the chat AI reads and edits the same store live.
+function PreparedMessageSection({ contactId }: { contactId: string }) {
+  const msg = usePreparedMessage((s) => s.byContact[contactId])
+  const load = usePreparedMessage((s) => s.load)
+  const save = usePreparedMessage((s) => s.save)
+  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    void load(contactId).then(() => setLoadedFor(contactId))
+  }, [contactId, load])
+
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--fg-faint)' }}>Mensaje preparado</span>
+        {msg && (
+          <span style={{ fontSize: 9, color: 'var(--fg-faint)' }} title={`Guardado ${msg.updatedAt}`}>
+            guardado
+          </span>
+        )}
+      </span>
+      <textarea
+        value={loadedFor === contactId ? (msg?.body ?? '') : ''}
+        placeholder="Borrador siempre guardado para este contacto…"
+        onChange={(e) => save(contactId, e.target.value)}
+        rows={4}
+        style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px', fontSize: 13, outline: 'none', background: 'var(--bg-elevated)', color: 'var(--fg)', resize: 'vertical', fontFamily: 'inherit' }}
+      />
+    </label>
+  )
+}
+
+// Two todo lists per contact — private and shared. Shared is local-only for
+// now (contacts are plain fichas without user_id); the split is the data seam
+// for future tunnel sync.
+function ContactTodosSection({ contactId }: { contactId: string }) {
+  const { todos, addTodo, toggleTodo, removeTodo } = useContactTodos(contactId)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <TodoList
+        title="Tareas privadas"
+        list={CONTACT_TODO_PRIVATE}
+        todos={todos.filter((t) => t.list === CONTACT_TODO_PRIVATE)}
+        onAdd={addTodo}
+        onToggle={toggleTodo}
+        onRemove={removeTodo}
+      />
+      <TodoList
+        title="Tareas compartidas"
+        hint="solo local por ahora"
+        list={CONTACT_TODO_SHARED}
+        todos={todos.filter((t) => t.list === CONTACT_TODO_SHARED)}
+        onAdd={addTodo}
+        onToggle={toggleTodo}
+        onRemove={removeTodo}
+      />
+    </div>
+  )
+}
+
+function TodoList({
+  title,
+  hint,
+  list,
+  todos,
+  onAdd,
+  onToggle,
+  onRemove,
+}: {
+  title: string
+  hint?: string
+  list: ContactTodoRole
+  todos: ReturnType<typeof useContactTodos>['todos']
+  onAdd: (title: string, list: ContactTodoRole) => Promise<void>
+  onToggle: (id: string) => Promise<void>
+  onRemove: (todo: ReturnType<typeof useContactTodos>['todos'][number]) => Promise<void>
+}) {
+  const [draft, setDraft] = useState('')
+
+  async function submit() {
+    const t = draft.trim()
+    if (!t) return
+    setDraft('')
+    await onAdd(t, list)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--fg-faint)' }}>{title}</span>
+        {hint && <span style={{ fontSize: 9, color: 'var(--fg-faint)' }}>({hint})</span>}
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {todos.map((t) => (
+          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' }}>
+            <input type="checkbox" checked={t.done} onChange={() => void onToggle(t.id)} style={{ cursor: 'pointer' }} />
+            <span style={{ flex: 1, fontSize: 13, color: t.done ? 'var(--fg-faint)' : 'var(--fg)', textDecoration: t.done ? 'line-through' : 'none' }}>
+              {t.title}
+            </span>
+            <button
+              onClick={() => void onRemove(t)}
+              title="Eliminar tarea"
+              style={{ border: 'none', background: 'transparent', color: 'var(--fg-faint)', cursor: 'pointer', fontSize: 12 }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <input
+        value={draft}
+        placeholder="Añadir tarea…"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
+        style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 12, outline: 'none', background: 'var(--bg-elevated)', color: 'var(--fg)' }}
+      />
+    </div>
   )
 }

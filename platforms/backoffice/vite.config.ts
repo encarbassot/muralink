@@ -11,6 +11,7 @@ export default defineConfig({
       { find: '@muralink/types', replacement: fromRoot('../../packages/types/src/index.ts') },
       { find: '@muralink/core', replacement: fromRoot('../../packages/core/src/index.ts') },
       { find: '@muralink/ui', replacement: fromRoot('../../packages/ui/src/index.ts') },
+      { find: '@muralink/editor', replacement: fromRoot('../../packages/editor/src/index.ts') },
     ],
   },
   server: {

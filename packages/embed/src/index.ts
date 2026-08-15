@@ -16,7 +16,8 @@ export { MuralDashboard } from './dashboard/MuralDashboard.tsx'
 export type { MuralDashboardProps } from './dashboard/MuralDashboard.tsx'
 
 // ── Ready-to-mount module apps (each self-contained, local-first) ────────────
-export { NotesApp as Notes, NotesCard, MarkdownEditor, useNotes } from '@muralink/module-notes/web'
+export { NotesApp as Notes, NotesCard, useNotes } from '@muralink/module-notes/web'
+export { MarkdownEditor } from '@muralink/editor'
 export { RemindersApp as Reminders, useReminders } from '@muralink/module-reminders/web'
 export { ContactsApp as Contacts, ContactList, ContactCard, useContacts, makeJsonContactsAdapter } from '@muralink/module-contacts/web'
 export { makeReadonlyContactsAdapter } from '@muralink/module-contacts/adapter'

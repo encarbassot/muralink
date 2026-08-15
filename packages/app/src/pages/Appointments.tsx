@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { appointmentsApi, contactsApi } from '../api/index.ts'
-import { AppointmentList } from '@muralink/module-appointments/web'
-import type { YAppointment, AppointmentStatus } from '@muralink/module-appointments/types'
+import { AppointmentList } from '@muralink/module-calendar/web'
+import type { YAppointment, AppointmentStatus } from '@muralink/module-calendar/types'
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   scheduled: 'Programada',
@@ -67,7 +67,7 @@ export function Appointments() {
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Detalle de la cita</div>
 
             <dl style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px 0', fontSize: 14 }}>
-              <dt style={{ color: 'var(--muted-foreground)' }}>Cliente</dt>
+              <dt style={{ color: 'var(--muted-foreground)' }}>Contacto</dt>
               <dd>{contactMap[selected.contactId] ?? selected.contactId}</dd>
               <dt style={{ color: 'var(--muted-foreground)' }}>Servicio</dt>
               <dd>{serviceMap[selected.serviceId] ?? selected.serviceId}</dd>

@@ -1,0 +1,20 @@
+{
+  "name": "@instance/default",
+  "version": "0.0.0",
+  "description": "The default instance — neutral config, theme and module set. Copy it to make your own.",
+  "type": "module",
+  "main": "./modules.ts",
+  "exports": {
+    ".": "./modules.ts",
+    "./config": "./config.ts",
+    "./theme": "./theme.ts"
+  },
+  "dependencies": {
+    "@muralink/types": "*",
+    "@muralink/module-url": "*",
+    "@muralink/module-calendar": "*",
+    "@muralink/module-contacts": "*",
+    "@muralink/module-notes": "*"
+  },
+  "license": "MIT"
+}

@@ -31,6 +31,14 @@ export interface ScopedGrant {
   shareId: string
   rootPath: string
   role: Role
+  // Mural shares: the one mural this grant may read via /api/murales/shared.
+  muralId?: string
+  // Contact-location shares: grants GET /api/contacts/shared-locations,
+  // filtered by canView() against viewerEmail — see modules/contacts routes.
+  contactLocations?: boolean
+  // The signed-in tunnel account this grant was issued to, if any (murales'
+  // requireAccount / contact-location shares use this as the canView identity).
+  viewerEmail?: string
   // ISO string, or null for no expiry.
   expiresAt: string | null
 }
@@ -94,10 +102,12 @@ export function createScopedShareRouter(ownerRoot: string): Router {
     next()
   })
 
-  // POST /  { rootPath, role, expiresAt? } → { shareId, token, rootPath, role }
+  // POST /  { rootPath, role, expiresAt?, muralId?, contactLocations?, viewerEmail? }
+  // → { shareId, token, rootPath, role }
   router.post('/', (req: Request, res: Response): void => {
-    const { rootPath, role, expiresAt } = req.body as {
-      rootPath?: unknown; role?: unknown; expiresAt?: unknown
+    const { rootPath, role, expiresAt, muralId, contactLocations, viewerEmail } = req.body as {
+      rootPath?: unknown; role?: unknown; expiresAt?: unknown; muralId?: unknown
+      contactLocations?: unknown; viewerEmail?: unknown
     }
     if (typeof rootPath !== 'string' || !rootPath) { res.status(400).json({ error: 'rootPath required' }); return }
     if (!isRole(role)) { res.status(400).json({ error: 'role must be viewer|editor|admin' }); return }
@@ -112,6 +122,9 @@ export function createScopedShareRouter(ownerRoot: string): Router {
       shareId,
       rootPath: within,
       role,
+      muralId: typeof muralId === 'string' && muralId ? muralId : undefined,
+      contactLocations: contactLocations === true,
+      viewerEmail: typeof viewerEmail === 'string' && viewerEmail ? viewerEmail : undefined,
       expiresAt: typeof expiresAt === 'string' ? expiresAt : null,
     })
     res.status(201).json({ shareId, token, rootPath: within, role })

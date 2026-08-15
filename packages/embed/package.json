@@ -1,6 +1,6 @@
 {
   "name": "@muralink/embed",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Drop-in React package: recursive dashboard grid, embedded notes editor, contacts and calendar — local-first, works offline, zero backend. The single import surface for embedding Elio into any app.",
   "type": "module",
   "main": "./src/index.ts",
@@ -20,6 +20,7 @@
     "host:build": "vite build --config host/vite.config.ts"
   },
   "dependencies": {
+    "@muralink/editor": "^0.1.0",
     "@muralink/module-calendar": "^0.1.0",
     "@muralink/module-contacts": "^0.1.0",
     "@muralink/module-notes": "^0.1.0",

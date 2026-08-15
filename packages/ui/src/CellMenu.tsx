@@ -12,6 +12,10 @@ export interface CellMenuItem {
   icon?: string
   danger?: boolean
   disabled?: boolean
+  /** Small pill after the label — "advanced", "beta", … */
+  tag?: string
+  /** Second line under the label, for items that need a reason. */
+  hint?: string
   /** Items with different group keys get a separator drawn between them. */
   group?: string
   onSelect: () => void
@@ -92,9 +96,32 @@ export function CellMenu({ items, anchor, onClose }: CellMenuProps) {
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
               >
                 {item.icon && <span style={{ fontSize: 14, flexShrink: 0, width: 16, textAlign: 'center' }}>{item.icon}</span>}
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.label}
+                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.label}
+                  </span>
+                  {item.hint && (
+                    <span style={{ fontSize: 10, color: 'var(--fg-faint)', whiteSpace: 'normal', lineHeight: 1.3 }}>
+                      {item.hint}
+                    </span>
+                  )}
                 </span>
+                {item.tag && (
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 9,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.4,
+                      padding: '2px 5px',
+                      borderRadius: 5,
+                      border: '1px solid var(--border)',
+                      color: 'var(--fg-faint)',
+                    }}
+                  >
+                    {item.tag}
+                  </span>
+                )}
               </button>
             </div>
           )

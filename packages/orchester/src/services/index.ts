@@ -33,6 +33,7 @@ export function buildDefaultServices(orchester: Orchester): ServiceConfig[] {
     coreService(),
     webFrontendService(orchester),
     nasService(orchester),
+    mailService(),
     httpsService(orchester),
     electronService(),
   ]
@@ -143,6 +144,29 @@ function nasService(orchester: Orchester): ServiceConfig {
     },
     currentStatus() {
       return { running: process.env['ELIO_NAS_ENABLED'] === 'true', port: null }
+    },
+  }
+}
+
+function mailService(): ServiceConfig {
+  const tsxBin = join(repoRoot, 'node_modules/.bin/tsx')
+  return {
+    id: 'mail',
+    label: 'Mail service',
+    description: 'SMTP + mail storage for self-hosted email (requires domain DNS setup).',
+    driver: 'process',
+    mode: 'process',
+    command: tsxBin,
+    args: ['platforms/server/src/mail-server/daemon.ts'],
+    cwd: repoRoot,
+    configurable: false,
+    env: {
+      ELIO_MAIL_ENABLED: process.env['ELIO_MAIL_ENABLED'] ?? 'false',
+      ELIO_MAIL_DOMAIN: process.env['ELIO_MAIL_DOMAIN'] ?? '',
+      ELIO_MAIL_SMTP_PORT: process.env['ELIO_MAIL_SMTP_PORT'] ?? '25',
+      ELIO_MAIL_SUBMISSION_PORT: process.env['ELIO_MAIL_SUBMISSION_PORT'] ?? '587',
+      ELIO_MAIL_DKIM_SELECTOR: process.env['ELIO_MAIL_DKIM_SELECTOR'] ?? 'default',
+      ELIO_MAIL_TLS_EMAIL: process.env['ELIO_MAIL_TLS_EMAIL'] ?? '',
     },
   }
 }

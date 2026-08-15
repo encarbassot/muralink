@@ -15,6 +15,7 @@ import {
   listMerged,
   spaceFor,
   moveItem,
+  getAmbientSpace,
 } from '@muralink/spaces'
 import type { YCalendarEvent } from '../../types.ts'
 import {
@@ -56,7 +57,9 @@ export function makeEvent(start: Date, end: Date, opts: MakeOpts = {}): YCalenda
   if (opts.createdBy) metadata['createdBy'] = opts.createdBy
   return {
     id: uid(),
-    title: opts.title ?? 'Nuevo evento',
+    // Empty by default: the editor opens right after create with the title
+    // input blank (placeholder showing); save() falls back to 'Sin título'.
+    title: opts.title ?? '',
     start: { iso: start.toISOString(), timezone: TZ },
     end: { iso: end.toISOString(), timezone: TZ },
     duration: { seconds },
@@ -115,7 +118,8 @@ export const useEvents = create<EventsState>((set, get) => ({
   },
 
   async add(start, end, opts = {}) {
-    const provider = getProvider(opts.target ?? get().defaultTarget)
+    // New events follow the active dashboard's space (ambient) when set.
+    const provider = getProvider(opts.target ?? getAmbientSpace() ?? get().defaultTarget)
     if (!provider) return null
     const ev = makeEvent(start, end, opts)
     const created = await provider.create(ev)

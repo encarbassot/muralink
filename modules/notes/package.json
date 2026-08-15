@@ -1,7 +1,7 @@
 {
   "name": "@muralink/module-notes",
   "version": "0.1.0",
-  "description": "notes — local-first markdown notes with a VSCode + Notion style editor.",
+  "description": "notes \u2014 local-first markdown notes with a VSCode + Notion style editor.",
   "type": "module",
   "main": "./manifest.ts",
   "exports": {
@@ -19,18 +19,12 @@
     "README.md"
   ],
   "dependencies": {
+    "@muralink/editor": "^0.1.0",
     "@muralink/shell": "^0.1.0",
     "@muralink/spaces": "^0.1.0",
     "@muralink/types": "^0.1.0",
     "@muralink/ui": "^0.1.0",
-    "zustand": "^5.0.8",
-    "@codemirror/commands": "^6.6.0",
-    "@codemirror/lang-markdown": "^6.3.0",
-    "@codemirror/language": "^6.10.2",
-    "@codemirror/search": "^6.5.6",
-    "@codemirror/state": "^6.4.1",
-    "@codemirror/view": "^6.28.0",
-    "@lezer/common": "^1.2.1"
+    "zustand": "^5.0.8"
   },
   "peerDependencies": {
     "react": ">=18",

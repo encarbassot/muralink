@@ -84,7 +84,11 @@ const orchesterApi = {
     const handler = (_e, services) => cb(services);
     electron.ipcRenderer.on("orchester:status-change", handler);
     return () => electron.ipcRenderer.off("orchester:status-change", handler);
-  }
+  },
+  // Account link (anonymous-first): status / login / logout against the Tunnel.
+  accountStatus: () => electron.ipcRenderer.invoke("orchester:accountStatus"),
+  accountLogin: (params) => electron.ipcRenderer.invoke("orchester:accountLogin", params),
+  accountLogout: () => electron.ipcRenderer.invoke("orchester:accountLogout")
 };
 const presenceApi = {
   getDevices: () => electron.ipcRenderer.invoke("presence:devices"),

@@ -22,5 +22,11 @@
     "@types/react": "^19.1.13",
     "typescript": "^5.9.2"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/state": "^6.4.0",
+    "@codemirror/view": "~6.38.1",
+    "@codemirror/commands": "^6.3.0",
+    "@codemirror/lang-javascript": "^6.2.0"
+  }
 }

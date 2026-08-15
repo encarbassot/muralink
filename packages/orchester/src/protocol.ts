@@ -18,7 +18,10 @@ export type RpcMethod =
   | 'ping'
   | 'accountStatus'
   | 'accountLogin'
+  | 'accountLoginOtp'
   | 'accountLogout'
+  | 'tunnelShare'
+  | 'tunnelShares'
 
 export interface LogLine {
   id: string

@@ -12,9 +12,11 @@ import {
   AccountAgent,
   loadAccount,
   linkAccount,
+  linkAccountWithCode,
   unlinkAccount,
   type AccountStatus,
 } from './account'
+import type { Role } from './tunnel-agent'
 
 interface PersistedConfig {
   // per-service overrides applied on boot
@@ -165,11 +167,41 @@ export function startDaemon(orchester: Orchester, shares?: ShareManager): Promis
         await account.refresh()
         return accountStatus()
       }
+      case 'accountLoginOtp': {
+        await linkAccountWithCode({
+          tunnelBaseUrl: p['tunnelBaseUrl'] as string,
+          code: p['code'] as string,
+          label: (p['label'] as string | undefined) ?? 'instance',
+        })
+        await account.refresh()
+        return accountStatus()
+      }
       case 'accountLogout': {
         await unlinkAccount()
         account.stop()
         return accountStatus()
       }
+      // Share a local folder through the tunnel. Resolves with the guest URL.
+      case 'tunnelShare': {
+        const agent = account.agent
+        if (!agent) throw new Error('not linked / agent offline — login first')
+        const { url, tunnelShareId } = await agent.shareFolder({
+          rootPath: p['rootPath'] as string,
+          pathLabel: (p['pathLabel'] as string | undefined) ?? (p['rootPath'] as string),
+          role: ((p['role'] as string | undefined) ?? 'viewer') as Role,
+          password: (p['password'] as string | undefined) ?? '',
+          targetEmail: (p['targetEmail'] as string | undefined) ?? null,
+          expiresAt: (p['expiresAt'] as string | undefined) ?? null,
+          // Mural entity shares: kind 'mural' + the mural id the scoped token
+          // may read; requireAccount gates non-public murals to signed-in users.
+          kind: (p['kind'] as 'folder' | 'mural' | undefined) ?? 'folder',
+          muralId: p['muralId'] as string | undefined,
+          requireAccount: p['requireAccount'] === true,
+        })
+        return { url, tunnelShareId }
+      }
+      case 'tunnelShares':
+        return account.agent?.shares ?? []
       case 'subscribe':
         return orchester.getStatus()
       default:

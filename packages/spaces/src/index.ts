@@ -4,10 +4,11 @@
 // build their stores on the helpers here; hosts inject remote spaces.
 
 export type { SpaceId, SpaceEntity, SpaceQuery, StorageSpace } from './space'
-export { registerSpace, unregisterSpace, getSpace, listSpaces, stamp } from './registry'
+export { registerSpace, unregisterSpace, getSpace, listSpaces, listCollections, stamp } from './registry'
 export { makeIdbSpace, type IdbSpaceConfig } from './idbSpace'
 export { makeHttpSpace, type HttpSpaceConfig } from './httpSpace'
 export { makeTunnelSpace, type TunnelSpaceConfig } from './tunnelSpace'
+export { makeCollabSpace, type CollabSpaceConfig } from './collabSpace'
 export {
   type SpacePrefs,
   loadPrefs,
@@ -18,4 +19,22 @@ export {
   spaceFor,
   moveItem,
   writableSpaces,
+  setAmbientSpace,
+  getAmbientSpace,
 } from './store'
+export {
+  RELATIONS,
+  RELATION_TYPES,
+  matchRelation,
+  matchRelationType,
+  relationToParams,
+  listRelationsFor,
+  relationTypesBetween,
+  newRelationType,
+} from './relations'
+export {
+  ContainmentCycleError,
+  type InstanceNode,
+  assertNoContainmentCycle,
+  resolveTree,
+} from './traverse'

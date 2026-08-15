@@ -8,15 +8,18 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
-    "./frontend-server": "./src/frontend-server.ts"
+    "./frontend-server": "./src/frontend-server.ts",
+    "./deploy": "./src/deploy/index.ts"
   },
   "bin": {
     "orchester": "./bin/orchester.mjs",
-    "orchesterd": "./bin/orchesterd.mjs"
+    "orchesterd": "./bin/orchesterd.mjs",
+    "orchester-deploy": "./bin/orchester-deploy.mjs"
   },
   "scripts": {
     "daemon": "tsx src/daemon-main.ts",
     "dev": "tsx src/cli/index.tsx",
+    "deploy": "tsx src/deploy/cli.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

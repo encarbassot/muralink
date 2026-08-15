@@ -16,14 +16,22 @@ import { join, basename, dirname } from 'node:path'
 import express, { Router, type Request, type Response, type NextFunction } from 'express'
 import cors from 'cors'
 import type { InstanceConfig } from '../config.ts'
+import { relative, sep } from 'node:path'
 import { listDir, serveFile, safePathWithin } from '../file-routes/index.ts'
 import type { Access } from '../middleware/auth.ts'
+import { getEntitlement } from '../entitlement/index.ts'
 import { roleAllows, type Op } from '../scoped-tokens/index.ts'
+import { registerUploadRoutes, gcUploads, type UploadHooks } from './upload.ts'
+import { createNasQuota, du, wouldExceed, type NasQuota } from './quota.ts'
+
+export { createNasQuota, du, type NasQuota } from './quota.ts'
 
 export interface NasConfig {
   enabled: boolean
   rootPath: string
   port?: number  // standalone server port; defaults to 3002
+  // Storage cap in bytes (ELIO_NAS_MAX_BYTES). Absent = unlimited (self-host).
+  maxBytes?: number
 }
 
 export interface NasSession {
@@ -46,7 +54,9 @@ export function resolveNasConfig(instanceConfig: InstanceConfig): NasConfig | nu
   }
 
   const port = process.env['ELIO_NAS_PORT'] ? Number(process.env['ELIO_NAS_PORT']) : undefined
-  return { enabled: true, rootPath, port }
+  const maxRaw = Number(process.env['ELIO_NAS_MAX_BYTES'])
+  const maxBytes = Number.isFinite(maxRaw) && maxRaw > 0 ? maxRaw : undefined
+  return { enabled: true, rootPath, port, maxBytes }
 }
 
 // Router exposing the NAS folder, confined to rootPath. Mount at /api/storage.
@@ -58,8 +68,14 @@ export function resolveNasConfig(instanceConfig: InstanceConfig): NasConfig | nu
 // ownerRoot) or 'scoped' (a relayed guest — role-limited, root pinned to the
 // share folder, which must lie inside ownerRoot). A request with no access
 // (the standalone LAN server, which has no auth) is treated as master.
-export function createStorageRouter(ownerRoot: string): Router {
+export function createStorageRouter(ownerRoot: string, hooks: UploadHooks = {}, quota?: NasQuota): Router {
   const router = Router()
+  void gcUploads(ownerRoot) // sweep stale .uploads parts from crashed sessions
+  const q = quota ?? createNasQuota(ownerRoot, null)
+
+  const overQuota = (res: Response, usedBytes: number): void => {
+    res.status(413).json({ error: 'quota exceeded', usedBytes, maxBytes: q.maxBytes })
+  }
 
   // Effective root for this request: the share folder for guests, ownerRoot
   // otherwise. Stashed on the request by the gate.
@@ -67,7 +83,8 @@ export function createStorageRouter(ownerRoot: string): Router {
 
   // Per-route gate: resolves the effective root and enforces the role's ops.
   const gate = (op: Op) => (req: Request, res: Response, next: NextFunction): void => {
-    const access = (req as { access?: Access }).access ?? { kind: 'master' as const }
+    const access = (req as { access?: Access }).access
+      ?? { kind: 'master' as const, entitlement: getEntitlement() }
     if (access.kind === 'master') {
       ;(req as { effRoot?: string }).effRoot = ownerRoot
       next()
@@ -83,6 +100,14 @@ export function createStorageRouter(ownerRoot: string): Router {
 
   router.get('/root', gate('read'), (req: Request, res: Response) => {
     res.json({ root: effRoot(req) })
+  })
+
+  // Owner-wide usage — master only (a relayed guest must not see beyond its
+  // share, and usage spans the whole root).
+  router.get('/usage', (req: Request, res: Response) => {
+    const access = (req as { access?: Access }).access
+    if (access && access.kind !== 'master') { res.status(403).json({ error: 'master only' }); return }
+    void q.usedBytes().then((usedBytes) => res.json({ usedBytes, maxBytes: q.maxBytes }))
   })
 
   router.get('/list', gate('read'), async (req: Request, res: Response) => {
@@ -108,9 +133,15 @@ export function createStorageRouter(ownerRoot: string): Router {
 
   // ── Write operations (all confined to the effective root) ────────────────
 
-  // Upload: raw body bytes written to <dir>/<name>. Client posts the File with
-  // Content-Type application/octet-stream so the global json parser skips it.
-  router.post('/upload', gate('write'), express.raw({ type: () => true, limit: '2gb' }), async (req: Request, res: Response) => {
+  // Chunked/resumable upload (streamed to disk — the path for bulk media dumps).
+  registerUploadRoutes(router, ownerRoot, gate, effRoot, hooks, q)
+
+  // Legacy single-shot upload: raw body bytes written to <dir>/<name>. Client
+  // posts the File with Content-Type application/octet-stream so the global
+  // json parser skips it. Kept for small files/compat — it buffers the WHOLE
+  // body in memory, so the limit is deliberately modest; large files must use
+  // the chunked routes above.
+  router.post('/upload', gate('write'), express.raw({ type: () => true, limit: '64mb' }), async (req: Request, res: Response) => {
     const root = effRoot(req)
     const dirRaw = typeof req.query['dir'] === 'string' ? req.query['dir'] : root
     const name = typeof req.query['name'] === 'string' ? req.query['name'] : ''
@@ -119,7 +150,11 @@ export function createStorageRouter(ownerRoot: string): Router {
     const dest = safePathWithin(root, join(dir, basename(name)))
     if (!dest) { res.status(403).json({ error: 'forbidden' }); return }
     try {
-      await writeFile(dest, req.body as Buffer)
+      const body = req.body as Buffer
+      if (await wouldExceed(q, body.length)) { overQuota(res, await q.usedBytes()); return }
+      await writeFile(dest, body)
+      q.invalidate()
+      hooks.onFileWritten?.(relative(ownerRoot, dest).split(sep).join('/'))
       res.json({ ok: true, path: dest })
     } catch (e) {
       res.status(500).json({ error: String(e) })
@@ -138,7 +173,7 @@ export function createStorageRouter(ownerRoot: string): Router {
     const root = effRoot(req)
     const target = safePathWithin(root, String((req.body as { path?: string }).path ?? ''))
     if (!target || target === root) { res.status(403).json({ error: 'forbidden' }); return }
-    try { await rm(target, { recursive: true, force: true }); res.json({ ok: true }) }
+    try { await rm(target, { recursive: true, force: true }); q.invalidate(); res.json({ ok: true }) }
     catch (e) { res.status(500).json({ error: String(e) }) }
   })
 
@@ -158,8 +193,12 @@ export function createStorageRouter(ownerRoot: string): Router {
     const src = safePathWithin(root, String(from ?? ''))
     const dst = safePathWithin(root, String(to ?? ''))
     if (!src || !dst) { res.status(403).json({ error: 'forbidden' }); return }
-    try { await cp(src, dst, { recursive: true }); res.json({ ok: true }) }
-    catch (e) { res.status(500).json({ error: String(e) }) }
+    try {
+      if (await wouldExceed(q, await du(src))) { overQuota(res, await q.usedBytes()); return }
+      await cp(src, dst, { recursive: true })
+      q.invalidate()
+      res.json({ ok: true })
+    } catch (e) { res.status(500).json({ error: String(e) }) }
   })
 
   return router

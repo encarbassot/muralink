@@ -17,9 +17,13 @@
   },
   "license": "MIT",
   "dependencies": {
-    "electron": "^33.4.11"
+    "electron": "^33.4.11",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "tsx": "^4.7.0"
+  },
+  "overrides": {
+    "@codemirror/view": "~6.38.1"
   }
 }

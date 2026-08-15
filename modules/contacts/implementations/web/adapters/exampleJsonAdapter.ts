@@ -16,7 +16,7 @@ import {
 
 interface ExampleJsonConfig {
   id: string // space id, e.g. 'bikehunter'
-  label: string // shown in the source switcher, e.g. 'Clientes BikeHunter'
+  label: string // shown in the source switcher, e.g. 'Contactos BikeHunter'
   /** Endpoint returning a JSON array of your customer records. */
   url: string
   /** Sent as Authorization: Bearer <token>, if your endpoint needs it. */

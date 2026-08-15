@@ -33,7 +33,7 @@ import { makeJsonContactsAdapter } from '@muralink/module-contacts/web'
 
 registerSpace('contacts', makeJsonContactsAdapter({
   id: 'bikehunter',
-  label: 'Clientes',
+  label: 'Contactos',
   url: '/api/elio/customers',
   toContact: (r: any) => ({
     id: `bh-${r.id}`,

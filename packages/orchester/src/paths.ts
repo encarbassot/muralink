@@ -14,6 +14,10 @@ export const paths = {
   state: join(elioHome, 'orchester.json'),
   instance: join(elioHome, 'instance.json'),
   account: join(elioHome, 'account.json'),
+  // Cached signed entitlement (the license). Written by the account-link layer,
+  // read by the core's entitlement verifier. Its presence is what a self-hosted
+  // enterprise instance verifies multi-user against; absence = free single-user.
+  entitlement: join(elioHome, 'entitlement.json'),
   tls: join(elioHome, 'tls'),
   log: join(elioHome, 'orchester.log'),
 }

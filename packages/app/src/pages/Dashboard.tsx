@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { calendarApi, appointmentsApi } from '../api/index.ts'
 import { DayStrip } from '@muralink/module-calendar/web'
-import { AppointmentList } from '@muralink/module-appointments/web'
-import { BookingWidget } from '@muralink/module-appointments/web'
+import { AppointmentList } from '@muralink/module-calendar/web'
+import { BookingWidget } from '@muralink/module-calendar/web'
 
 function todayRange() {
   const from = new Date()

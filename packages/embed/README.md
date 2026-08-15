@@ -114,7 +114,7 @@ by default. Shared spaces converge by polling (~30s) and on window focus.
 import { registerSpace, makeJsonContactsAdapter } from '@muralink/embed'
 
 registerSpace('contacts', makeJsonContactsAdapter({
-  id: 'crm', label: 'Clientes',
+  id: 'crm', label: 'Contactos',
   url: '/api/customers',                 // GET ?q=<text> → [{...}]
   toContact: (r) => ({ id: `crm-${r.id}`, name: r.name, externalId: String(r.id),
                        source: 'crm', createdAt: { iso: r.created_at, timezone: 'UTC' } }),

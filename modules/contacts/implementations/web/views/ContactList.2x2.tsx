@@ -4,13 +4,15 @@ import type { YContact } from '../../../types.ts'
 interface Props {
   contacts?: YContact[]
   onContactClick?: (contact: YContact) => void
+  /** Read-only (outfocus): hide the search box, static list. */
+  readOnly?: boolean
 }
 
 function initials(name: string): string {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
 }
 
-export function ContactList({ contacts = [], onContactClick }: Props) {
+export function ContactList({ contacts = [], onContactClick, readOnly = false }: Props) {
   const [search, setSearch] = useState('')
   const filtered = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -20,23 +22,25 @@ export function ContactList({ contacts = [], onContactClick }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', fontFamily: 'inherit' }}>
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border, #d4cfc9)' }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar cliente..."
-          style={{
-            width: '100%',
-            border: '1px solid var(--border, #d4cfc9)',
-            borderRadius: 6,
-            padding: '6px 10px',
-            fontSize: 13,
-            outline: 'none',
-            background: 'var(--background, #f9f7f4)',
-            boxSizing: 'border-box',
-          }}
-        />
-      </div>
+      {!readOnly && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border, #d4cfc9)' }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar contacto..."
+            style={{
+              width: '100%',
+              border: '1px solid var(--border, #d4cfc9)',
+              borderRadius: 6,
+              padding: '6px 10px',
+              fontSize: 13,
+              outline: 'none',
+              background: 'var(--background, #f9f7f4)',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      )}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {filtered.map(contact => (
           <div

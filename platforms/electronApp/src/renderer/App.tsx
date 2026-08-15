@@ -13,6 +13,7 @@ import { FilesApp, initFilesApp } from '@/apps/files'
 import { CalculatorApp } from '@/apps/calculator'
 import { DashboardAppDescriptor } from '@/apps/dashboard'
 import { OrchesterAppDescriptor } from '@/apps/orchester'
+import { LocalDeviceApp, initLocalDeviceApp } from '@/apps/localDevice'
 
 // Layout constants — tweak here to adjust spacing globally
 const SIDEBAR_W = 80   // px: left gutter (covers macOS traffic lights)
@@ -58,6 +59,8 @@ export function App() {
     void initFilesApp().then(() => {
       registerApp(FilesApp)
     })
+    initLocalDeviceApp()
+    registerApp(LocalDeviceApp)
   }, [registerApp])
 
   // Terminal resize drag

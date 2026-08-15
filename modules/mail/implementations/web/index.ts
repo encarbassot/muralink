@@ -1,0 +1,5 @@
+export { MailApp } from './MailApp.tsx'
+export { useMailStore } from './mailStore.ts'
+export { MailSetupWizard } from './MailSetupWizard.tsx'
+export { mailSetupApi } from './setupApi.ts'
+export type { MailSetupStatus, MailSetupInput, MailVerifyResult } from './setupApi.ts'

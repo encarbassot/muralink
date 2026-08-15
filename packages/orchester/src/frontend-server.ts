@@ -134,8 +134,14 @@ export class FrontendServer {
             res.writeHead(200, { 'Content-Type': mime(p), 'Content-Length': data.length })
             res.end(data)
           } catch {
+            // SPA fallback is for *navigations* only. A request that names a
+            // file extension (/assets/index-abc.css after a redeploy changed
+            // the hash) must 404 — answering it with index.html returns HTML
+            // under a text/html type, which the browser silently discards.
+            // That failure mode looks like "the app lost its styles" with no
+            // error anywhere. Fail loudly instead.
             const index = path.join(servePath, 'index.html')
-            if (p !== index && fs.existsSync(index)) {
+            if (path.extname(p) === '' && p !== index && fs.existsSync(index)) {
               send(index)
             } else {
               res.writeHead(404, { 'Content-Type': 'text/plain' })

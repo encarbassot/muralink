@@ -8,7 +8,21 @@
 // functions, not manifests.
 
 import type { ReactNode } from 'react'
-import type { GridCellRecord, BentoSize } from '@muralink/types'
+import type { GridCellRecord, BentoSize, LayoutConstraints } from '@muralink/types'
+
+/** One selectable flavor of a module at add time (Android-widget-picker style).
+ *  Picking a variant seeds the new cell's props — the module's render dispatches
+ *  on them. Absent/empty variants = the module adds directly, as before. */
+export interface ModuleVariant {
+  id: string
+  label: string
+  icon: string
+  description?: string
+  /** Seed for the new cell's props (e.g. { view: 'board' }). */
+  defaultProps?: Record<string, unknown>
+  /** Overrides the descriptor's defaultSize for this variant. */
+  defaultSize?: BentoSize
+}
 
 export interface ModuleDescriptor {
   moduleId: string
@@ -21,6 +35,11 @@ export interface ModuleDescriptor {
   isIconOnly?: boolean
   /** If true: registered for rendering existing cells, but hidden from the add picker. */
   hiddenFromPicker?: boolean
+  /** Add-time flavors. When present, the add picker asks which one to place. */
+  variants?: ModuleVariant[]
+  /** Window-manager layout intent (min/max/preferred/aspect/orientation/priority/grow).
+   *  Consumed by auto layout; ignored in freeform. Absent = grid decides. */
+  constraints?: LayoutConstraints
 }
 
 /** Capabilities a platform exposes to its cells. Each cell uses what it needs. */
@@ -37,8 +56,16 @@ export interface CellContext {
   updateCell?: (cellId: string, patch: Partial<GridCellRecord>) => void
   /** Open the full-screen text editor overlay for a text cell. */
   openTextEditor?: (cellId: string) => void
+  /** Scroll a cell into view and focus it — the Dock's pinned-icon click target. */
+  focusCell?: (cellId: string) => void
   /** Jump to the app drawer (electron) */
   goToDrawer?: () => void
+  /**
+   * Focus/outfocus: true only for the single focused cell. Widgets render
+   * interactive when focused and a read-only variant when not. Undefined in
+   * hosts that don't use the focus model (treated as interactive/legacy).
+   */
+  focused?: boolean
 }
 
 // ── Widget methods + config tabs ──────────────────────────────────────────────
@@ -99,6 +126,27 @@ export type OnClickBinding =
   | { kind: 'url'; url: string }
   | { kind: 'none' }
 
+// ── Focus surfaces ────────────────────────────────────────────────────────────
+// A module can declare edge surfaces for FOCUS mode: rows of square action
+// buttons and/or panels that emerge parallel to the card's edges. The HOST
+// wraps what `render` returns — kind 'actions' in an ActionRow, kind 'panel'
+// in an EdgePanel (both from @muralink/ui) — docked at `edge`. Hosts that
+// don't use the focus model simply never read this field.
+
+export type SurfaceEdge = 'top' | 'bottom' | 'left' | 'right'
+
+/** An edge surface a module declares for focus mode. */
+export interface FocusSurface {
+  id: string
+  edge: SurfaceEdge
+  kind: 'actions' | 'panel'
+  /** For 'panel': open as soon as the cell is focused. Default true. */
+  autoOpen?: boolean
+  render: (cell: GridCellRecord, ctx: CellContext) => ReactNode
+  /** Reuses the method gating (minSizes etc.). Omitted = always. */
+  visibility?: CellMethodVisibility
+}
+
 export interface CellModule {
   descriptor: ModuleDescriptor
   render: (cell: GridCellRecord, ctx: CellContext, isDragging: boolean) => ReactNode
@@ -106,6 +154,13 @@ export interface CellModule {
   methods?: CellMethod[]
   /** Standalone config tabs not tied to a method (always available in config). */
   tabs?: CellTab[]
+  /** Edge surfaces shown when the cell is focused (ActionRows / EdgePanels). */
+  focusSurfaces?: FocusSurface[]
+  /** Custom Dock representation for a pinned cell (rendered inside an `ActionButton`
+   *  size 's'). Unrelated to `focusSurfaces` — this replaces the icon shown while
+   *  UNFOCUSED and tiny in the Dock, not a decoration on a focused full-size cell.
+   *  Falls back to `descriptor.icon` when absent. */
+  dockIcon?: (cell: GridCellRecord, ctx: CellContext) => ReactNode
 }
 
 function PlaceholderCell({ moduleId }: { moduleId: string }): ReactNode {
@@ -149,6 +204,11 @@ export class CellRegistry {
     return this.mods.get(moduleId)?.descriptor
   }
 
+  /** Module-level layout constraints for a cell (for the auto layout resolver). */
+  getConstraints(moduleId: string): LayoutConstraints | undefined {
+    return this.mods.get(moduleId)?.descriptor.constraints
+  }
+
   getModule(moduleId: string): CellModule | undefined {
     return this.mods.get(moduleId)
   }
@@ -159,6 +219,10 @@ export class CellRegistry {
 
   getTabs(moduleId: string): CellTab[] {
     return this.mods.get(moduleId)?.tabs ?? []
+  }
+
+  getFocusSurfaces(moduleId: string): FocusSurface[] {
+    return this.mods.get(moduleId)?.focusSurfaces ?? []
   }
 
   /** The default on-click method: explicit isDefault, else the first clickable one. */

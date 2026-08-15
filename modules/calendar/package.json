@@ -7,18 +7,21 @@
   "exports": {
     ".": "./manifest.ts",
     "./types": "./types.ts",
+    "./recurrence": "./recurrence.ts",
     "./web": "./implementations/web/index.ts",
     "./server": "./implementations/server/index.ts"
   },
   "files": [
     "manifest.ts",
     "types.ts",
+    "recurrence.ts",
     "implementations",
     "README.md"
   ],
   "dependencies": {
     "@muralink/spaces": "^0.1.0",
     "@muralink/types": "^0.1.0",
+    "@muralink/ui": "^0.1.0",
     "zustand": "^5.0.8"
   },
   "peerDependencies": {

@@ -1,0 +1,214 @@
+/* Omnibar — shared styles. Uses the host's theme tokens (--bg, --fg, --accent…). */
+
+.omni-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.omni-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 460px;
+  max-width: 92vw;
+}
+
+.omni-modal {
+  width: 460px;
+  max-width: 92vw;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  padding: 18px;
+}
+
+/* ── Context section (top) ─────────────────────────────────────────────────── */
+
+.omni-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.omni-context--selection,
+.omni-context--note {
+  border-color: var(--accent, #4c9fff);
+  background: var(--accent-dim, rgba(76, 159, 255, 0.12));
+}
+
+.omni-context-label {
+  flex-shrink: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+}
+
+.omni-context-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omni-context-action {
+  flex-shrink: 0;
+  border: 1px solid var(--accent, #4c9fff);
+  background: transparent;
+  color: var(--accent, #4c9fff);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.omni-context-dismiss,
+.omni-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-faint);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+/* ── Input row ─────────────────────────────────────────────────────────────── */
+
+.omni-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.omni-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg-faint);
+}
+
+.omni-badge-hint {
+  flex: 1;
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+
+.omni-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  outline: none;
+}
+
+/* ── Translate module ──────────────────────────────────────────────────────── */
+
+.omni-tr-langs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.omni-tr-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+}
+
+.omni-tr-arrow {
+  flex-shrink: 0;
+  color: var(--fg-faint);
+}
+
+.omni-tr-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  resize: vertical;
+  outline: none;
+}
+
+.omni-tr-status {
+  padding: 10px 4px;
+  font-size: 12px;
+  color: var(--fg-faint);
+}
+
+.omni-tr-error {
+  color: var(--danger, #ff6b6b);
+}
+
+.omni-tr-result {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+}
+
+.omni-tr-result-lang {
+  flex-shrink: 0;
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+
+.omni-tr-result-text {
+  color: var(--fg);
+  font-size: 13px;
+}
+
+.omni-tr-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+.omni-tr-key {
+  font-family: ui-monospace, monospace;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-right: 4px;
+}

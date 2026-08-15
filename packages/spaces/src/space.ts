@@ -21,6 +21,15 @@ export interface SpaceQuery {
   to?: string // ISO — range end
   text?: string
   limit?: number
+  // Relational filters — consumed by the 'relations' / 'relationTypes' collections
+  // and by instance collections resolving list/nested members. Additive: a space
+  // that ignores them simply returns everything (the existing contract).
+  ids?: string[] // fetch a specific set (e.g. resolving InstanceList members)
+  fromId?: string
+  toId?: string
+  fromType?: string
+  toType?: string
+  role?: string
 }
 
 export interface StorageSpace<T extends SpaceEntity> {

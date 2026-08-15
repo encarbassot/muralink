@@ -9,9 +9,69 @@ import { CellMenu, type CellMenuItem } from './CellMenu.js'
 
 const MIN_SPAN = 0.5  // smallest side of a cell, in cells (0.5-cell grid)
 const MAX_SPAN = 3  // largest side of a cell, in cells
+const PX_SNAP = 10  // live drag preview snaps every 10px; final commit still rounds to MIN_SPAN
 
 function clampSpan(v: number, max: number): number {
   return Math.max(MIN_SPAN, Math.min(max, snap05(v)))
+}
+
+/** The 8 grab points around a cell: 4 corners + 4 edge midpoints. */
+type HandleDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+
+const HANDLES: { dir: HandleDir; cursor: string; top: number | string; left: number | string }[] = [
+  { dir: 'nw', cursor: 'nwse-resize', top: 0, left: 0 },
+  { dir: 'n', cursor: 'ns-resize', top: 0, left: '50%' },
+  { dir: 'ne', cursor: 'nesw-resize', top: 0, left: '100%' },
+  { dir: 'e', cursor: 'ew-resize', top: '50%', left: '100%' },
+  { dir: 'se', cursor: 'nwse-resize', top: '100%', left: '100%' },
+  { dir: 's', cursor: 'ns-resize', top: '100%', left: '50%' },
+  { dir: 'sw', cursor: 'nesw-resize', top: '100%', left: 0 },
+  { dir: 'w', cursor: 'ew-resize', top: '50%', left: 0 },
+]
+
+interface ResizeTarget {
+  col: number
+  row: number
+  cols: number
+  rows: number
+}
+
+/** Given a drag direction and raw pixel delta, compute the new position + span.
+ *  Corners move two edges at once; n/s/e/w move exactly one. The edge(s) not
+ *  being dragged stay pinned — e.g. dragging `w` keeps the right edge fixed. */
+function resizeTarget(
+  dir: HandleDir,
+  start: { col: number; row: number; cols: number; rows: number },
+  dxPx: number,
+  dyPx: number,
+  unitW: number,
+  columns: number,
+): ResizeTarget {
+  const snappedDx = Math.round(dxPx / PX_SNAP) * PX_SNAP
+  const snappedDy = Math.round(dyPx / PX_SNAP) * PX_SNAP
+  const dCols = snappedDx / unitW
+  const dRows = snappedDy / unitW
+
+  let { col, row, cols, rows } = start
+
+  if (dir === 'e' || dir === 'ne' || dir === 'se') {
+    cols = clampSpan(start.cols + dCols, Math.min(MAX_SPAN, columns - start.col))
+  }
+  if (dir === 'w' || dir === 'nw' || dir === 'sw') {
+    const rightEdge = start.col + start.cols
+    cols = clampSpan(start.cols - dCols, Math.min(MAX_SPAN, rightEdge))
+    col = snap05(rightEdge - cols)
+  }
+  if (dir === 's' || dir === 'sw' || dir === 'se') {
+    rows = clampSpan(start.rows + dRows, MAX_SPAN)
+  }
+  if (dir === 'n' || dir === 'nw' || dir === 'ne') {
+    const bottomEdge = start.row + start.rows
+    rows = clampSpan(start.rows - dRows, Math.min(MAX_SPAN, bottomEdge))
+    row = snap05(bottomEdge - rows)
+  }
+
+  return { col, row, cols, rows }
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -25,19 +85,25 @@ interface GridCellProps {
   isDragging?: boolean
   isDisplaced?: boolean
   editMode?: boolean
+  /** Focus/outfocus model (opt-in). When on, only the focused cell shows chrome
+   *  + interactive content; others are click-to-focus. */
+  focusMode?: boolean
+  focused?: boolean
+  onFocus?: () => void
   onDragStart?: (cellId: string, pos: GridCellPosition, e: React.PointerEvent) => void
   onClick?: () => void
   onEditClick?: () => void
-  onResize?: (cellId: string, newSize: GridSize) => void
+  /** `newPosition` is set when a top/left handle also moved the cell's origin. */
+  onResize?: (cellId: string, newSize: GridSize, newPosition?: GridCellPosition) => void
   /** Returns the header ⋯ menu items for this cell. Empty/absent hides the ⋯ button. */
   getCellMenu?: (cell: GridCellRecord) => CellMenuItem[]
   children: React.ReactNode
   style?: React.CSSProperties
 }
 
-// ── Resize corner handle ──────────────────────────────────────────────────────
+// ── Resize handles — 4 corners + 4 edge midpoints ─────────────────────────────
 
-function ResizeHandle({
+function ResizeHandles({
   cell,
   cellSize,
   gap,
@@ -49,33 +115,30 @@ function ResizeHandle({
   cellSize: number
   gap: number
   columns: number
-  onResize?: (cellId: string, newSize: GridSize) => void
+  onResize?: (cellId: string, newSize: GridSize, newPosition?: GridCellPosition) => void
   onResizingChange?: (active: boolean) => void
 }) {
-  const [draft, setDraft] = useState<{ cols: number; rows: number } | null>(null)
+  const [draft, setDraft] = useState<ResizeTarget | null>(null)
+  const [activeDir, setActiveDir] = useState<HandleDir | null>(null)
   const unitW = cellSize + gap
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
+    (dir: HandleDir) => (e: React.PointerEvent<HTMLDivElement>) => {
       if (!onResize) return
       const resize = onResize
       e.preventDefault()
       e.stopPropagation()
       ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
       onResizingChange?.(true)
+      setActiveDir(dir)
 
       const { cols: startCols, rows: startRows } = sizeSpan(cell.size)
+      const start = { col: cell.position.col, row: cell.position.row, cols: startCols, rows: startRows }
       const startX = e.clientX
       const startY = e.clientY
 
-      // Room to the right edge caps width; height is capped at MAX_SPAN.
-      const maxCols = Math.min(MAX_SPAN, columns - cell.position.col)
-
-      // Snap the dragged span to the nearest 0.5-cell step.
-      function target(ev: PointerEvent): { cols: number; rows: number } {
-        const cols = clampSpan(startCols + (ev.clientX - startX) / unitW, maxCols)
-        const rows = clampSpan(startRows + (ev.clientY - startY) / unitW, MAX_SPAN)
-        return { cols, rows }
+      function target(ev: PointerEvent): ResizeTarget {
+        return resizeTarget(dir, start, ev.clientX - startX, ev.clientY - startY, unitW, columns)
       }
 
       function onMove(ev: PointerEvent) {
@@ -83,9 +146,11 @@ function ResizeHandle({
       }
 
       function onUp(ev: PointerEvent) {
-        const { cols, rows } = target(ev)
-        resize(cell.id, `${cols}x${rows}`)
+        const { col, row, cols, rows } = target(ev)
+        const moved = col !== start.col || row !== start.row
+        resize(cell.id, `${cols}x${rows}`, moved ? { col, row } : undefined)
         setDraft(null)
+        setActiveDir(null)
         onResizingChange?.(false)
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
@@ -97,25 +162,24 @@ function ResizeHandle({
     [cell, unitW, columns, onResize, onResizingChange],
   )
 
-  const { cols: draftCols, rows: draftRows } = draft
-    ? draft
-    : sizeSpan(cell.size)
-
   const { cols: currentCols, rows: currentRows } = sizeSpan(cell.size)
-  const draftW = draftCols * cellSize + (draftCols - 1) * gap
-  const draftH = draftRows * cellSize + (draftRows - 1) * gap
-  const currW = currentCols * cellSize + (currentCols - 1) * gap
-  const currH = currentRows * cellSize + (currentRows - 1) * gap
+  const start = { col: cell.position.col, row: cell.position.row, cols: currentCols, rows: currentRows }
+  const draftBox = draft ?? start
+
+  const offsetLeft = (draftBox.col - start.col) * unitW
+  const offsetTop = (draftBox.row - start.row) * unitW
+  const draftW = draftBox.cols * cellSize + (draftBox.cols - 1) * gap
+  const draftH = draftBox.rows * cellSize + (draftBox.rows - 1) * gap
 
   return (
     <>
-      {/* Live draft size preview overlay */}
-      {draft && (draft.cols !== currentCols || draft.rows !== currentRows) && (
+      {/* Live draft size/position preview overlay */}
+      {draft && (draft.cols !== currentCols || draft.rows !== currentRows || offsetLeft !== 0 || offsetTop !== 0) && (
         <div
           style={{
             position: 'absolute',
-            top: 0,
-            left: 0,
+            top: offsetTop,
+            left: offsetLeft,
             width: draftW,
             height: draftH,
             borderRadius: 'var(--capsule-radius, 14px)',
@@ -128,32 +192,32 @@ function ResizeHandle({
         />
       )}
 
-      {/* The actual handle grip — bottom-right corner */}
-      <div
-        onPointerDown={onPointerDown}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute',
-          bottom: 4,
-          right: 4,
-          width: 16,
-          height: 16,
-          borderRadius: 4,
-          background: 'rgba(255,255,255,0.15)',
-          border: '1px solid rgba(255,255,255,0.25)',
-          cursor: 'nwse-resize',
-          zIndex: 25,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        title={`Resize (${currW}×${currH})`}
-      >
-        <svg width="8" height="8" viewBox="0 0 8 8" fill="rgba(255,255,255,0.7)">
-          <path d="M7 1v6H1" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-          <circle cx="7" cy="7" r="1.2"/>
-        </svg>
-      </div>
+      {/* 8 grab dots — 4 corners + 4 edge midpoints */}
+      {HANDLES.map(({ dir, cursor, top, left }) => (
+        <div
+          key={dir}
+          onPointerDown={onPointerDown(dir)}
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={() => setActiveDir(dir)}
+          onMouseLeave={() => setActiveDir((d) => (d === dir ? null : d))}
+          style={{
+            position: 'absolute',
+            top,
+            left,
+            transform: 'translate(-50%, -50%)',
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: 'var(--accent, #4c9fff)',
+            border: '2px solid var(--bg, #f9f7f4)',
+            boxShadow: activeDir === dir ? '0 0 0 3px rgba(76, 159, 255, 0.35)' : '0 1px 2px rgba(0,0,0,0.25)',
+            cursor,
+            zIndex: 25,
+            transition: 'box-shadow 0.1s',
+          }}
+          title={`Resize (${currentCols}×${currentRows})`}
+        />
+      ))}
     </>
   )
 }
@@ -169,6 +233,9 @@ export function GridCell({
   isDragging = false,
   isDisplaced = false,
   editMode = false,
+  focusMode = false,
+  focused = false,
+  onFocus,
   onDragStart,
   onClick,
   onEditClick,
@@ -185,6 +252,13 @@ export function GridCell({
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number } | null>(null)
   const menuItems = getCellMenu?.(cell) ?? []
 
+  // Focus model: the focused cell shows edit chrome + interactive content;
+  // legacy editMode shows chrome + a click shield. focusMode never shields
+  // (the read-only vs interactive split is handled by the widget via ctx.focused).
+  const chrome = editMode || focused
+  const shield = editMode && !focused
+  const resizeAllowed = focusMode ? (editMode || focused) : true
+
   const { cols: colSpan, rows: rowSpan } = bentoSizeToCols(cell.size)
   const unitW = cellSize + gap
   const pos = livePos ?? cell.position
@@ -194,9 +268,10 @@ export function GridCell({
 
   return (
     <div
+      data-cell-id={cell.id}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onClick={!editMode ? onClick : undefined}
+      onClick={editMode ? undefined : focusMode ? (focused ? undefined : onFocus) : onClick}
       style={{
         position: 'absolute',
         left: pos.col * unitW,
@@ -205,10 +280,11 @@ export function GridCell({
         height,
         borderRadius: 'var(--capsule-radius, 14px)',
         background: 'var(--bg, #f9f7f4)',
-        border: `1px solid ${editMode && hovered ? 'var(--accent, #4c9fff)' : 'var(--border, #d4cfc9)'}`,
-        overflow: editMode || hovered || resizing ? 'visible' : 'hidden',
+        border: `1px solid ${focused || (editMode && hovered) || (resizeAllowed && (hovered || resizing)) ? 'var(--accent, #4c9fff)' : 'var(--border, #d4cfc9)'}`,
+        boxShadow: focused ? '0 0 0 2px var(--accent-dim, rgba(76,159,255,0.35))' : undefined,
+        overflow: chrome || hovered || resizing ? 'visible' : 'hidden',
         boxSizing: 'border-box',
-        cursor: editMode ? 'default' : onClick ? 'pointer' : 'default',
+        cursor: focusMode ? (focused ? 'default' : 'pointer') : editMode ? 'default' : onClick ? 'pointer' : 'default',
         userSelect: 'none',
         transition: isDragging
           ? 'none'
@@ -225,16 +301,17 @@ export function GridCell({
         {children}
       </div>
 
-      {/* Edit mode: transparent shield prevents child-click accidents */}
-      {editMode && (
+      {/* Global edit mode: transparent shield prevents child-click accidents.
+          The focused cell is intentionally NOT shielded so its content stays live. */}
+      {shield && (
         <div
           style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'auto' }}
           onClick={(e) => e.stopPropagation()}
         />
       )}
 
-      {/* Edit mode: drag handle + pencil bar (fades in on hover) */}
-      {editMode && (
+      {/* Drag handle + config bar — shown for the focused cell or in edit mode */}
+      {chrome && (
         <div
           style={{
             position: 'absolute',
@@ -336,9 +413,11 @@ export function GridCell({
         </div>
       )}
 
-      {/* Resize handle — bottom-right corner, always available on hover. */}
-      {(hovered || isDragging || resizing) && (
-        <ResizeHandle
+      {/* Resize handles — 4 corners + 4 edge midpoints. In focus mode only the
+          focused cell (or global edit mode) can resize; otherwise available on
+          hover (legacy default). */}
+      {(hovered || isDragging || resizing) && resizeAllowed && (
+        <ResizeHandles
           cell={cell}
           cellSize={cellSize}
           gap={gap}

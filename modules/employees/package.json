@@ -8,10 +8,12 @@
     ".": "./manifest.ts",
     "./types": "./types.ts",
     "./web": "./implementations/web/index.ts",
-    "./server": "./implementations/server/index.ts"
+    "./server": "./implementations/server/index.ts",
+    "./adapter": "./adapter.ts"
   },
   "dependencies": {
-    "@muralink/types": "*"
+    "@muralink/types": "*",
+    "@muralink/spaces": "*"
   },
   "license": "MIT"
 }

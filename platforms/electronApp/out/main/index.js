@@ -9,7 +9,7 @@ const express = require("express");
 const cors = require("cors");
 const node_events = require("node:events");
 const node_child_process = require("node:child_process");
-const client$1 = require("@elio/orchester/client");
+const client$1 = require("@muralink/orchester/client");
 const HOME$2 = node_os.homedir();
 const ROOTS = [HOME$2];
 const TEXT_CAP = 1e6;
@@ -671,6 +671,9 @@ const orchesterAdapter = {
   addShare: async (opts) => (await get()).addShare(opts),
   removeShare: async (id) => (await get()).removeShare(id),
   updateShare: async (id, patch) => (await get()).updateShare(id, patch),
+  accountStatus: async () => (await get()).accountStatus(),
+  accountLogin: async (params) => (await get()).accountLogin(params),
+  accountLogout: async () => (await get()).accountLogout(),
   close: () => {
     client?.close();
     client = null;
@@ -778,6 +781,9 @@ function registerIpc() {
     "orchester:updateShare",
     (_e, id, patch) => orchesterAdapter.updateShare(id, patch)
   );
+  electron.ipcMain.handle("orchester:accountStatus", () => orchesterAdapter.accountStatus());
+  electron.ipcMain.handle("orchester:accountLogin", (_e, params) => orchesterAdapter.accountLogin(params));
+  electron.ipcMain.handle("orchester:accountLogout", () => orchesterAdapter.accountLogout());
   electron.ipcMain.handle("presence:devices", () => presenceService.list());
   presenceService.on("change", (devices) => {
     for (const win of electron.BrowserWindow.getAllWindows()) {
@@ -792,7 +798,7 @@ function createWindow() {
     height: 760,
     minWidth: 720,
     minHeight: 480,
-    title: "Elio Files",
+    title: "Mural Files",
     backgroundColor: "#0b0d10",
     titleBarStyle: "hiddenInset",
     // native macOS traffic lights, our own chrome

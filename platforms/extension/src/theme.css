@@ -1,0 +1,22 @@
+/* Extension side panel theme — the canonical token set plus panel chrome. */
+@import '../../../packages/app/src/styles/tokens.css';
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg, #0b0d10);
+  color: var(--fg, #e6e9ee);
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  font-size: 14px;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}

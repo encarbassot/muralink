@@ -7,11 +7,18 @@
   "exports": {
     ".": "./manifest.ts",
     "./types": "./types.ts",
+    "./pricing": "./pricing.ts",
     "./web": "./implementations/web/index.ts",
     "./server": "./implementations/server/index.ts"
   },
+  "scripts": {
+    "verify": "tsx verify.ts"
+  },
   "dependencies": {
-    "@muralink/types": "*"
+    "@muralink/types": "*",
+    "@muralink/calc": "*",
+    "@muralink/ui": "*",
+    "@muralink/payments": "*"
   },
   "license": "MIT"
 }

@@ -1,0 +1,13 @@
+[Unit]
+Description=rathole client — Orchester tunnel (outbound, data plane)
+After=network.target muralink-orchesterd.service
+
+[Service]
+Type=simple
+User=__USER__
+ExecStart=/usr/local/bin/rathole __CONFIG__
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

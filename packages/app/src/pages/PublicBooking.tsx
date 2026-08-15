@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { appointmentsApi, contactsApi } from '../api/index.ts'
-import type { YService, YAvailableSlot } from '@muralink/module-appointments/types'
-import instanceConfig from '@hair-saloon/instance/config'
-import instanceTheme from '@hair-saloon/instance/theme'
+import type { YService, YAvailableSlot } from '@muralink/module-calendar/types'
+import instanceConfig from '@instance/config'
+import instanceTheme from '@instance/theme'
 
 type Step = 'service' | 'date' | 'slot' | 'contact' | 'confirm' | 'done'
 

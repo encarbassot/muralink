@@ -29,9 +29,22 @@ export interface TunnelAgentConfig {
 export interface ShareSpec {
   rootPath: string
   role: Role
-  password: string
+  // Empty/omitted = public link (no password gate).
+  password?: string
   pathLabel: string
+  // Set = only that signed-in account may open the share.
+  targetEmail?: string | null
   expiresAt?: string | null
+  // 'mural' shares one mural entity (rootPath = its file folder); default 'folder'.
+  kind?: 'folder' | 'mural'
+  // Mural shares: the mural id the scoped token may read via /api/murales/shared.
+  muralId?: string
+  // Contact-location shares: grants GET /api/contacts/shared-locations,
+  // filtered server-side by canView(viewerEmail). No real folder involved —
+  // rootPath is just the owner root, to satisfy the scoped-token mint.
+  contactLocations?: boolean
+  // Any signed-in tunnel account may access (non-public murals).
+  requireAccount?: boolean
 }
 
 interface RegisteredShare {
@@ -55,6 +68,17 @@ export class TunnelAgent {
   #closed = false
 
   constructor(private cfg: TunnelAgentConfig) {}
+
+  // Snapshot of the shares this agent has registered (for status UIs).
+  get shares(): { pathLabel: string; rootPath: string; role: Role; url?: string; tunnelShareId?: string }[] {
+    return this.#shares.map((s) => ({
+      pathLabel: s.spec.pathLabel,
+      rootPath: s.spec.rootPath,
+      role: s.spec.role,
+      url: s.url,
+      tunnelShareId: s.tunnelShareId,
+    }))
+  }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -110,12 +134,66 @@ export class TunnelAgent {
     return { url, tunnelShareId: shareId }
   }
 
+  // Public: share one mural. The share's folder is the mural's file directory
+  // (murales/<id> under the NAS root) so its files ride the storage relay; the
+  // scoped token additionally grants reading the mural JSON via
+  // /api/murales/shared. Non-public murals require any signed-in account.
+  async shareMural(opts: {
+    muralId: string
+    title: string
+    isPublic: boolean
+    // Absolute path of the mural's file folder inside the served root.
+    filesRoot: string
+    expiresAt?: string | null
+  }): Promise<{ url: string; tunnelShareId: string }> {
+    return this.shareFolder({
+      rootPath: opts.filesRoot,
+      role: 'viewer',
+      pathLabel: opts.title,
+      kind: 'mural',
+      muralId: opts.muralId,
+      requireAccount: !opts.isPublic,
+      expiresAt: opts.expiresAt ?? null,
+    })
+  }
+
+  // Public: invite one contact to poll my published locations. The scoped
+  // token grants GET /api/contacts/shared-locations, filtered server-side to
+  // whatever that contact's account (targetEmail) may see — see
+  // modules/contacts/implementations/server/routes.ts.
+  async shareContactLocations(opts: {
+    targetEmail: string
+    label: string
+    // Absolute path inside the served root — no real folder is read; this
+    // only satisfies the scoped-token mint's rootPath requirement.
+    ownerRoot: string
+    expiresAt?: string | null
+  }): Promise<{ url: string; tunnelShareId: string }> {
+    return this.shareFolder({
+      rootPath: opts.ownerRoot,
+      role: 'viewer',
+      pathLabel: opts.label,
+      kind: 'folder',
+      contactLocations: true,
+      targetEmail: opts.targetEmail,
+      requireAccount: true,
+      expiresAt: opts.expiresAt ?? null,
+    })
+  }
+
   // Mint a scoped token from the local core for this folder + role.
   async #mintScopedToken(spec: ShareSpec): Promise<string> {
     const res = await fetch(`${this.cfg.coreBaseUrl}/api/shares`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.cfg.masterToken}` },
-      body: JSON.stringify({ rootPath: spec.rootPath, role: spec.role, expiresAt: spec.expiresAt ?? null }),
+      body: JSON.stringify({
+        rootPath: spec.rootPath,
+        role: spec.role,
+        expiresAt: spec.expiresAt ?? null,
+        muralId: spec.muralId,
+        contactLocations: spec.contactLocations,
+        viewerEmail: spec.targetEmail ?? undefined,
+      }),
     })
     if (!res.ok) throw new Error(`mint scoped token failed: ${res.status} ${await res.text()}`)
     const data = (await res.json()) as { token: string }
@@ -134,8 +212,11 @@ export class TunnelAgent {
         reqId,
         role: spec.role,
         pathLabel: spec.pathLabel,
-        password: spec.password,
+        password: spec.password ?? '',
+        targetEmail: spec.targetEmail ?? null,
         expiresAt: spec.expiresAt ?? null,
+        kind: spec.kind ?? 'folder',
+        requireAccount: spec.requireAccount === true,
       }))
     })
   }

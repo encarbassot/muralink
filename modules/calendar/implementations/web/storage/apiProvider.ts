@@ -30,6 +30,9 @@ export function makeApiProvider(cfg: ApiConfig): StorageProvider {
       start: e.start,
       end: e.end,
       allDay: e.allDay,
+      rrule: e.rrule,
+      blocks: e.blocks,
+      facets: e.facets,
       metadata: e.metadata,
     }),
   })

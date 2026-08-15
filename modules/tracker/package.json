@@ -1,0 +1,40 @@
+{
+  "name": "@muralink/module-tracker",
+  "version": "0.1.0",
+  "description": "tracker — local-first time tracking: timers over project murals, elapsed-time entries.",
+  "type": "module",
+  "main": "./manifest.ts",
+  "exports": {
+    ".": "./manifest.ts",
+    "./types": "./types.ts",
+    "./time": "./time.ts",
+    "./web": "./implementations/web/index.ts",
+    "./server": "./implementations/server/index.ts"
+  },
+  "files": [
+    "manifest.ts",
+    "types.ts",
+    "time.ts",
+    "implementations",
+    "README.md"
+  ],
+  "dependencies": {
+    "@muralink/spaces": "^0.1.0",
+    "@muralink/types": "^0.1.0",
+    "zustand": "^5.0.8"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "express": ">=4",
+    "better-sqlite3": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}

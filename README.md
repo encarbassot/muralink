@@ -1,86 +1,94 @@
-<div align="center">
-
 # Muralink
 
-**A local-first, open-source platform for building the tools your business needs.**
-Install modules (notes, contacts, calendar, reminders…), compose them into
-recursive dashboards, and embed the whole thing into any app. Works fully
-offline; sharing and cloud sync are opt-in.
+A local-first platform you assemble yourself. Install modules — notes, contacts,
+calendar, files, passwords — and compose them into dashboards that nest inside
+each other. It runs on your machine, offline, whether or not we exist.
 
-*We don't want your data. You own the code.*
+> **We don't want your data.** Open source, verifiable, self-hostable.
+> **You own the code.** Hosting means a whole machine, not a folder in someone's cloud.
 
-</div>
+## The two rules everything else follows
 
----
+- **Local-first.** Every feature works with the network off. Reaching the
+  internet is an optional path in every function, never a precondition. Sharing
+  and sync are opt-in.
+- **Single-user core.** The open platform has no accounts, no tenants, no
+  billing. Several people sharing one instance is a separate front; several
+  isolated accounts is a separate product. Neither is in here.
 
-## What's here
+## Run it
 
-This is the Muralink monorepo — the **single source of truth** for the platform.
-The npm package [`@muralink/embed`](https://www.npmjs.com/package/@muralink/embed)
-is a built artifact published *from* this repo (see [`packages/embed`](packages/embed)).
+On a clean Linux box — installs git and node, clones, and hands over to the
+deploy wizard:
 
-```
-packages/
-  types      @muralink/types      zero-dep primitive types (the interoperability contract)
-  ui         @muralink/ui         bento grid engine (drag/resize, displacement)
-  shell      @muralink/shell      app shell + cell registry
-  spaces     @muralink/spaces     storage spaces: local / company server / encrypted cloud
-  core       @muralink/core       module registry + dependency graph
-  embed      @muralink/embed      the single public React surface  ← published to npm
-modules/
-  notes · contacts · calendar · reminders · url · appointments · …   installable feature modules
-platforms/
-  server     the orchester — API + git/sqlite storage a company runs on its own machine
-  web · electron · backoffice     reference clients
-instances/
-  bikehunter · hair-saloon         pre-configured deployments (config + modules + theme)
+```sh
+curl -fsSL https://raw.githubusercontent.com/encarbassot/muralink/main/scripts/bootstrap.sh | bash
 ```
 
-> The cloud API ("tunnel") that powers cross-company sharing is **not** in this
-> repo — this is the open platform; that mother API stays closed. Everything here
-> runs fully without it.
+From a checkout:
 
-## Use it — the embed
-
-The fastest way in is the published package. No backend, no account:
-
-```bash
-npm i @muralink/embed react react-dom
+```sh
+npm install                              # npm workspaces, one install at the root
+npm run dev -w @muralink/platform-web    # the web app
+npm run orchester                        # the instance console (TUI)
 ```
 
-```tsx
-import { MuralDashboard } from '@muralink/embed'
-import '@muralink/embed/theme.css'
+Node 20+. Install guides: [Linux](docs/install/linux.md) ·
+[macOS](docs/install/mac.md) · [Windows](docs/install/windows.md).
 
-<MuralDashboard theme="dark" user={{ id: 'u1', name: 'Eloi' }} />
+## How it fits together
+
+```
+packages/   types (zero-dep primitives) · core (ModuleRegistry, DAG) ·
+            ui (bento grid engine) · shell (app shell, cell registry) ·
+            spaces (storage: local / server / encrypted cloud) ·
+            editor · calc · omnibar · realtime · ai · payments ·
+            orchester (the daemon + deploy wizard) · app · embed
+modules/    notes · contacts · calendar · reminders · murales · drive ·
+            gallery · stock · expenses · mail · maps · habits · tracker ·
+            passwords · calcsheet · attendance · employees · url · …
+platforms/  web · server · electronApp · extension · backoffice ·
+            designer · tunnel-web
+instances/  a deployment's own config, theme and module set
 ```
 
-Full docs: [`packages/embed/README.md`](packages/embed/README.md) ·
-[architecture](packages/embed/ARCHITECTURE.md) · [AI/contributor map](packages/embed/AGENTS.md).
+A **module** owns a feature and knows its data contract, not where it will be
+rendered. A **platform** is a runtime that mounts modules. An **instance** is one
+deployment saying who it is. The grid composes modules recursively: a dashboard
+is a widget, so dashboards nest.
 
-## Run the company server (optional — for sharing between employees)
+## Where to change things
 
-The "Servidor" storage space (shared notes/contacts/calendar across a team) is
-served by the orchester in [`platforms/server`](platforms/server):
+| Your change is about… | Work in |
+|---|---|
+| How a feature behaves | `modules/<name>/` |
+| Storage and sync | `packages/spaces/` |
+| The grid engine (drag, resize) | `packages/ui/` |
+| Which widgets exist | `packages/app/src/registry.tsx` |
+| The self-hosted server | `platforms/server/`, `packages/orchester/` |
+| The public embed surface | `packages/embed/` |
+| One deployment's config | `instances/<name>/` |
 
-```bash
-npm install
-ELIO_API_TOKEN=$(openssl rand -hex 32) npm run dev --workspace=platforms/server
-# → http://localhost:3001  (health: /health)
+## Embedding
+
+`@muralink/embed` publishes the same widgets the product ships, free to use:
+
+```sh
+npm install @muralink/embed
 ```
 
-Point the embed at it with `spaces={{ orchester: { baseUrl, token } }}`.
+## Docs
 
-## Develop
+[Architecture](docs/architecture.md) · [Module spec](docs/module-spec.md) ·
+[Self-hosting](docs/self-hosting.md) · [Distribution](docs/distribution.md) ·
+[Self-hosted mail](docs/self-hosted-mail.md)
 
-```bash
-npm install                                        # one install, npm workspaces
-npm run build -w @muralink/embed                   # build the embed bundle
-npx tsc --noEmit -p packages/embed/tsconfig.json   # typecheck
-```
+## Contributing
 
-See [AGENTS.md](AGENTS.md) for how the repo is organized and the conventions.
+[CONTRIBUTING.md](CONTRIBUTING.md) — the layout is the architecture, so most of
+contributing is knowing where a change belongs. Security issues:
+[SECURITY.md](SECURITY.md), never a public issue.
 
 ## License
 
-MIT. You own the code.
+MIT. See [LICENSE](LICENSE).

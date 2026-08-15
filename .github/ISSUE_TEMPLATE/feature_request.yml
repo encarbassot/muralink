@@ -1,0 +1,39 @@
+name: Feature or module proposal
+description: Something the platform should be able to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that you cannot do today? Describe the situation, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: Optional. If you already have a shape in mind, sketch it.
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Where would this live
+      options:
+        - A module (a feature — notes, calendar, …)
+        - The grid or the shared app
+        - Storage and sync
+        - The self-hosted server or the deploy wizard
+        - The embed API
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      description: These are non-negotiable in this project — see CONTRIBUTING.md.
+      options:
+        - label: This works offline, or degrades cleanly without a network
+          required: true
+        - label: This does not require multi-account or multi-tenant logic in the core
+          required: true

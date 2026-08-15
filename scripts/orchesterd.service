@@ -1,0 +1,15 @@
+[Unit]
+Description=Muralink orchester daemon
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO__
+ExecStart=__REPO__/node_modules/.bin/orchesterd
+Restart=on-failure
+RestartSec=3
+Environment=ELIO_HOME=__HOME__/.elio
+
+[Install]
+WantedBy=multi-user.target

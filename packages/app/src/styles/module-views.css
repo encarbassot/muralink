@@ -110,3 +110,703 @@
   text-align: center;
   padding: 8px;
 }
+
+/* murales — pinboard list + canvas chrome */
+.mural-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.mural-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 110px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  text-align: left;
+}
+.mural-card:hover {
+  border-color: var(--accent);
+}
+.mural-card.new {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  background: transparent;
+}
+.mural-tool-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg-dim);
+  border-radius: 6px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.mural-tool-btn.danger {
+  border-color: color-mix(in srgb, #ef4444 30%, transparent);
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+}
+.mural-tool-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.mural-tool-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+/* Marquee selection preview (drawn in world space inside the plane) */
+.mural-marquee {
+  border: 1.5px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* Contextual bottom action row (acts on the current selection) */
+.mural-context-bar {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.mural-context-count {
+  font-size: 11px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.mural-context-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  border-radius: 8px;
+  height: 30px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.mural-context-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.mural-context-btn.danger {
+  color: var(--danger, #e5484d);
+  border-color: color-mix(in srgb, var(--danger, #e5484d) 35%, transparent);
+}
+.mural-element {
+  border-radius: var(--radius-sm, 8px);
+  /* Left gutter is the drag-to-reorder zone. */
+  padding-left: 20px;
+}
+.mural-drag-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-faint);
+  font-size: 11px;
+  line-height: 1;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 120ms;
+  touch-action: none;
+  user-select: none;
+}
+.mural-element:hover .mural-drag-gutter {
+  opacity: 0.6;
+}
+.mural-drag-gutter:hover {
+  opacity: 1;
+}
+.mural-drag-gutter:active {
+  cursor: grabbing;
+}
+.mural-element.focused {
+  outline: 1px solid var(--accent);
+}
+.mural-element.merge-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: var(--radius-sm, 8px);
+}
+.mural-element.pinned {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 4px;
+  box-sizing: border-box;
+}
+.mural-element-chrome {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: auto;
+  display: flex;
+  gap: 2px;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.mural-element:hover .mural-element-chrome {
+  opacity: 1;
+}
+.mural-grip,
+.mural-menu-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg-dim);
+  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+  cursor: grab;
+}
+.mural-menu-btn {
+  cursor: pointer;
+}
+.mural-add-btn {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--fg-faint);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.mural-add-btn:hover {
+  color: var(--fg-dim);
+  border-color: var(--border-strong, var(--border));
+}
+
+/* murales — multi-view: tabs, nested groups, canvas view */
+.mural-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mural-tab {
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--fg-faint);
+  border-radius: 8px 8px 0 0;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.mural-tab.active {
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  margin-bottom: -1px;
+}
+.mural-group {
+  position: relative;
+  border: 1px solid var(--border);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 3%, transparent);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mural-element.nested {
+  border-radius: var(--radius-sm, 8px);
+}
+/* A column reads as one seamless document: no chrome, 0 gap between blocks. */
+.mural-column-doc {
+  border: none;
+  background: transparent;
+  padding: 0;
+  gap: 0;
+}
+.mural-column-doc .mural-element.nested {
+  padding-left: 20px; /* keep the reorder gutter */
+}
+.mural-title-menu {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.mural-group:hover .mural-title-menu {
+  opacity: 1;
+}
+.mural-canvas-view {
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--bg);
+}
+.mural-canvas-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+.mural-canvas-zoom {
+  font-size: 10px;
+  color: var(--fg-faint);
+  padding: 0 6px;
+  min-width: 36px;
+  text-align: right;
+}
+.mural-circle {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  cursor: grab;
+  box-sizing: border-box;
+}
+.mural-circle:hover {
+  border-color: var(--accent);
+}
+.mural-column {
+  /* Seamless document: no background, no chrome. A faint outline appears only
+     on hover/selection so the column is still grabbable. */
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-md, 12px);
+  cursor: grab;
+  box-sizing: border-box;
+}
+.mural-column:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.mural-column.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mural-canvas-box {
+  border-radius: var(--radius-sm, 8px);
+  cursor: grab;
+}
+.mural-ref-card {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+.mural-ref-card.missing {
+  border-style: dashed;
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+.mural-ref-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mural-ref-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mural-ref-open {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+.mural-ref-meta {
+  font-size: 10px;
+  color: var(--fg-faint);
+}
+.mural-ref-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.mural-ref-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.mural-ref-result:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.mural-ref-result.empty {
+  color: var(--fg-faint);
+  font-size: 12px;
+  cursor: default;
+}
+.mural-ref-result > span:first-child {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mural-ref-self {
+  font-size: 10px;
+  color: var(--fg-faint);
+  flex-shrink: 0;
+}
+.mural-canvas-box.focused {
+  outline: 1px solid var(--accent);
+  background: var(--bg-elevated);
+  cursor: auto;
+}
+.mural-card-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.mural-card-stats {
+  font-size: 10px;
+  color: var(--fg-faint);
+}
+.mural-preview-doc {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mural-preview-line {
+  font-size: 10px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mural-preview-empty {
+  font-size: 10px;
+  color: var(--fg-faint);
+}
+.mural-preview-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 70px;
+}
+
+/* murales canvas — selection, resize, quick-add */
+.mural-circle.selected,
+.mural-canvas-box.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mural-resize-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  cursor: nwse-resize;
+  z-index: 10;
+}
+.mural-circle .mural-resize-handle {
+  right: 12%;
+  bottom: 12%;
+}
+/* Connect port (mind-map edges): drag from here to another node. */
+.mural-connect-handle {
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  cursor: crosshair;
+  z-index: 10;
+  touch-action: none;
+}
+.mural-circle .mural-connect-handle {
+  right: 12%;
+  top: 12%;
+}
+.mural-fab {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 18px;
+  z-index: 60;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+.mural-fab:hover {
+  filter: brightness(1.1);
+}
+.mural-quickadd-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 18vh;
+}
+.mural-quickadd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(520px, 86%);
+}
+.mural-quickadd input {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 16px;
+  outline: none;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.mural-quickadd-hint {
+  font-size: 11px;
+  color: var(--fg-faint);
+  text-align: center;
+}
+
+/* murales — pending upload card spinner */
+.mural-file-pending {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--bg-elevated);
+  opacity: 0.85;
+}
+.mural-spinner {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: mural-spin 0.8s linear infinite;
+}
+@keyframes mural-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* murales — share panel */
+.mural-share-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 940;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+}
+.mural-share-panel {
+  width: min(440px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow, 0 12px 40px rgba(0, 0, 0, 0.4));
+}
+.mural-share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mural-share-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fg-faint);
+}
+.mural-share-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mural-share-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+}
+
+/* ── murales — vista MURAL (lienzo recursivo zoom-agnóstico) ─────────────── */
+.mural-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  outline: none;
+  background: var(--bg);
+}
+.mural-lienzo {
+  /* Width set inline (LIENZO_W local units); the camera scales it to fit. */
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 24px 32px 120px;
+}
+.mural-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mural-column-block {
+  border-radius: var(--radius-sm, 8px);
+  padding: 2px 4px;
+}
+.mural-column-block:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+.mural-column-block.editing {
+  outline: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.mural-column-group {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mural-column-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-dim);
+}
+.mural-column-empty {
+  color: var(--fg-faint);
+  font-size: 13px;
+  padding: 24px 0;
+}
+.mural-node {
+  box-sizing: border-box;
+  cursor: grab;
+}
+.mural-loose-box {
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  padding: 4px 6px;
+}
+.mural-loose-box:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.mural-node.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mural-node.editing {
+  cursor: text;
+}
+.mural-frame {
+  border-radius: var(--radius-md, 12px);
+  border: 1.5px dashed color-mix(in srgb, var(--fg) 18%, transparent);
+  min-height: 80px;
+  overflow: visible;
+}
+.mural-frame-title {
+  position: absolute;
+  top: -18px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-faint);
+  white-space: nowrap;
+}
+.mural-node-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 30%, transparent);
+}
+.mural-scale-handle {
+  cursor: ew-resize;
+}
+.mural-pull-ghost {
+  z-index: 90;
+  pointer-events: none;
+  max-width: 240px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--fg-dim);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}

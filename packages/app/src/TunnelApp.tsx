@@ -4,9 +4,11 @@
 // relay. Storage-only — no bento, no modules. See tunnel/docs/folder-share-relay.md.
 
 import { useEffect, useState } from 'react'
+import { MuralGuestView, setMuralStorage } from '@muralink/module-murales/web'
 import { StorageExplorer } from './StorageExplorer.tsx'
 import { type AppEnv, type GuestRole, AppEnvProvider } from './env.ts'
 import { configureApi } from './api/client.ts'
+import { storageApi } from './storageApi.ts'
 import './styles/tokens.css'
 import './styles/module-views.css'
 import './styles/base.css'
@@ -14,7 +16,12 @@ import './styles/base.css'
 interface ShareMeta {
   pathLabel: string
   role: GuestRole
+  // 'folder' (storage share, default) | 'mural' (one shared mural entity).
+  kind?: string
   requiresPassword: boolean
+  // Share addressed to one signed-in account (target_email server-side) or
+  // open to any signed-in account (require_account server-side).
+  requiresAccount?: boolean
 }
 
 // /s/<token> → token. Empty if the path is not a share link.
@@ -29,7 +36,7 @@ type Phase =
   | { k: 'ready'; env: AppEnv; meta: ShareMeta }
   | { k: 'error'; message: string }
 
-export function TunnelApp() {
+export function TunnelApp({ accountToken }: { accountToken?: string | null } = {}) {
   const token = tokenFromPath()
   const base = window.location.origin
   const shareBase = `${base}/s/${token}`
@@ -39,7 +46,36 @@ export function TunnelApp() {
   const [submitting, setSubmitting] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
 
-  // Load share metadata (label + role).
+  // Gate check → guest session → ready env. Shared by the password form and the
+  // no-password (public / account-targeted) auto path.
+  async function access(meta: ShareMeta, pwd: string | null): Promise<void> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    // Account-targeted shares authenticate with the signed-in account session.
+    if (accountToken) headers['Authorization'] = `Bearer ${accountToken}`
+    const res = await fetch(`${shareBase}/access`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(pwd ? { password: pwd } : {}),
+    })
+    if (res.status === 403) {
+      throw new Error(meta.requiresAccount && !meta.requiresPassword
+        ? 'Este enlace requiere iniciar sesión — entra con tu cuenta en la app y vuelve a abrirlo'
+        : 'Contraseña incorrecta')
+    }
+    if (!res.ok) throw new Error('No se pudo acceder')
+    const { guestToken, role } = (await res.json()) as { guestToken: string; role: GuestRole }
+    const env: AppEnv = {
+      platform: 'tunnel',
+      apiBaseUrl: shareBase, // storageApi hits ${shareBase}/api/storage/*
+      apiToken: guestToken,
+      hasOrchester: false,
+      role,
+    }
+    configureApi(env)
+    setPhase({ k: 'ready', env, meta })
+  }
+
+  // Load share metadata; without a password gate go straight in.
   useEffect(() => {
     if (!token) { setPhase({ k: 'error', message: 'Enlace inválido' }); return }
     fetch(`${shareBase}/meta`)
@@ -49,8 +85,12 @@ export function TunnelApp() {
         if (!r.ok) throw new Error('No se pudo cargar el recurso')
         return (await r.json()) as ShareMeta
       })
-      .then((meta) => setPhase({ k: 'password', meta }))
+      .then(async (meta) => {
+        if (meta.requiresPassword) setPhase({ k: 'password', meta })
+        else await access(meta, null)
+      })
       .catch((e) => setPhase({ k: 'error', message: String(e.message ?? e) }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, shareBase])
 
   async function submitPassword(e: React.FormEvent) {
@@ -59,25 +99,9 @@ export function TunnelApp() {
     setSubmitting(true)
     setAuthError(null)
     try {
-      const res = await fetch(`${shareBase}/access`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-      if (res.status === 403) { setAuthError('Contraseña incorrecta'); return }
-      if (!res.ok) { setAuthError('No se pudo acceder'); return }
-      const { guestToken, role } = (await res.json()) as { guestToken: string; role: GuestRole }
-      const env: AppEnv = {
-        platform: 'tunnel',
-        apiBaseUrl: shareBase, // storageApi hits ${shareBase}/api/storage/*
-        apiToken: guestToken,
-        hasOrchester: false,
-        role,
-      }
-      configureApi(env)
-      setPhase({ k: 'ready', env, meta: phase.meta })
-    } catch {
-      setAuthError('Error de red')
+      await access(phase.meta, password)
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Error de red')
     } finally {
       setSubmitting(false)
     }
@@ -112,18 +136,30 @@ export function TunnelApp() {
     )
   }
 
-  // ready — storage-only shell.
+  // ready — mural or storage shell, depending on the share kind.
+  const isMural = phase.meta.kind === 'mural'
+  if (isMural) {
+    // The mural's file cards serve through the relay with the guest token.
+    setMuralStorage({
+      uploadResumable: () => Promise.reject(new Error('read-only share')),
+      serveUrl: storageApi.serveUrl,
+      mkdir: () => Promise.reject(new Error('read-only share')),
+    })
+  }
+
   return (
     <AppEnvProvider value={phase.env}>
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg, #0b0d10)' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 16 }}>🗂️</span>
+          <span style={{ fontSize: 16 }}>{isMural ? '🧱' : '🗂️'}</span>
           <span style={{ fontWeight: 600 }}>{phase.meta.pathLabel}</span>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: 'var(--fg-faint)' }}>vía Tunnel</span>
         </header>
         <div style={{ flex: 1, minHeight: 0 }}>
-          <StorageExplorer />
+          {isMural
+            ? <MuralGuestView apiBase={shareBase} token={phase.env.apiToken} />
+            : <StorageExplorer />}
         </div>
       </div>
     </AppEnvProvider>

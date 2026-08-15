@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { contactsApi, appointmentsApi } from '../api/index.ts'
 import { ContactList } from '@muralink/module-contacts/web'
 import type { YContact } from '@muralink/module-contacts/types'
+import { useView } from '../viewStore.ts'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -14,6 +15,7 @@ function formatTime(iso: string) {
 
 export function Contacts() {
   const [selected, setSelected] = useState<YContact | null>(null)
+  const setView = useView((s) => s.setView)
 
   const { data: contacts = [] } = useQuery({
     queryKey: ['contacts'],
@@ -51,6 +53,13 @@ export function Contacts() {
                 {selected.phone && <div style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>{selected.phone.number}</div>}
                 {selected.email && <div style={{ fontSize: 14, color: 'var(--muted-foreground)' }}>{selected.email.address}</div>}
               </div>
+              <button
+                onClick={() => setView('expenses', selected.id)}
+                title="Abrir la cuenta con este contacto"
+                style={{ marginLeft: 'auto', alignSelf: 'center', border: '1px solid var(--border)', background: 'var(--muted)', color: 'var(--fg)', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                💰 Cuenta
+              </button>
             </div>
 
             {selected.notes && (
