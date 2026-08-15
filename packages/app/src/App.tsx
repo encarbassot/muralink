@@ -9,6 +9,7 @@ import { setAmbientSpace, type SpaceId } from '@muralink/spaces'
 import { PublicBooking } from './pages/PublicBooking.tsx'
 import { buildWebRegistry } from './registry.tsx'
 import { pinnedDockItems } from './pinnedDockItems.tsx'
+import { seedWelcomeMural } from './seedWelcome.ts'
 import { defaultLayout, WEB_LAYOUT_ID } from './defaultLayout.ts'
 import { useView, DASHBOARD } from './viewStore.ts'
 import { AppPanel } from './modals.tsx'
@@ -72,6 +73,13 @@ function WebShell({ env }: { env: AppEnv }) {
   useEffect(() => {
     setAmbientSpace(current.space)
   }, [current.space])
+
+  // First run on this device: the seeded dashboard shows a murales card, so
+  // give it something to show. Fire-and-forget — a failed seed must never stop
+  // the app from opening.
+  useEffect(() => {
+    void seedWelcomeMural()
+  }, [])
 
   // A vault subtree (layoutId prefixed `vault:`) persists its grid to the account
   // cloud core instead of localStorage, so it converges across devices. The cloud
