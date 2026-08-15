@@ -113,10 +113,25 @@ export function installServerVault(token: string): void {
   // over its own tiny endpoint (it is one record, not a collection). The server
   // sees ciphertext in both cases.
   registerSpace('vault-entries', makeHttpSpace({ ...common, path: '/api/passwords' }))
+  // 409 on this route means two very different things, and guessing produced
+  // the worst possible message: an uninstalled module was reported as "this
+  // server already has a vault with a different PIN", sending you to look for
+  // a vault that does not exist. The gate (requireInstalled) answers 409 for
+  // every module route, so the body is what tells them apart.
+  async function conflictMessage(res: Response): Promise<string> {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; entries?: number }
+    if (body.error === 'module_not_installed') {
+      return 'el módulo de contraseñas no está instalado en este servidor'
+    }
+    const n = body.entries ?? 0
+    return `este servidor ya tiene una bóveda con otro PIN${n ? ` (${n} entradas guardadas)` : ''}`
+  }
+
   setVaultMetaRemote({
     async get() {
       const res = await fetch('/api/passwords/meta', { headers: authHeaders(token) })
       if (res.status === 404) return null
+      if (res.status === 409) throw new Error(await conflictMessage(res))
       if (!res.ok) throw new Error(`vault meta ${res.status}`)
       return (await res.json()) as YVaultMeta
     },
@@ -126,9 +141,7 @@ export function installServerVault(token: string): void {
         headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
         body: JSON.stringify(meta),
       })
-      if (res.status === 409) {
-        throw new Error('este servidor ya tiene una bóveda con otro PIN')
-      }
+      if (res.status === 409) throw new Error(await conflictMessage(res))
       if (!res.ok) throw new Error(`vault meta ${res.status}`)
     },
   })
