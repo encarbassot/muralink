@@ -282,7 +282,15 @@ const source: DeployStep = {
     if (branch.ok && branch.stdout.trim() && branch.stdout.trim() !== repoBranch) {
       hints.push(`configured branch differs: ${repoBranch}`)
     }
-    if (dirty.ok && dirty.stdout.trim()) {
+    const changed = dirty.stdout.trim().split('\n').filter(Boolean)
+    // package-lock.json is modified on every deployed box — npm rewrites it on
+    // install. Reporting that as drift trains the operator to ignore the one
+    // warning that matters, so it is stated as a fact instead.
+    if (changed.length && changed.every((l) => l.endsWith('package-lock.json'))) {
+      hints.push('package-lock.json is locally generated (expected)')
+      return ok('checkout present', hints)
+    }
+    if (changed.length) {
       return warn('checkout has local changes — update would not be a fast-forward', hints)
     }
     return ok('checkout present', hints)
@@ -303,18 +311,6 @@ const source: DeployStep = {
       return warn('not a git checkout — left untouched')
     }
 
-    // `npm install` rewrites package-lock.json, so every deployed box has a
-    // dirty checkout within minutes of being installed, and would never accept
-    // an update again. The lock is generated: discard the local copy and let
-    // the dependencies step regenerate it. Any *other* local change is left
-    // alone and stops the update — that one is a human's edit, not a tool's.
-    const dirty = await run('git', ['status', '--porcelain'], { cwd: repoRoot })
-    const changed = dirty.stdout.trim().split('\n').filter(Boolean)
-    if (changed.length && changed.every((l) => l.endsWith('package-lock.json'))) {
-      ctx.log('discarding the generated package-lock.json…')
-      await run('git', ['checkout', '--', 'package-lock.json'], { cwd: repoRoot })
-    }
-
     // Fast-forward only. A deploy that silently merges or rebases is a deploy
     // that can ship something nobody wrote.
     ctx.log('git fetch…')
@@ -324,7 +320,19 @@ const source: DeployStep = {
     const co = await run('git', ['checkout', repoBranch], { cwd: repoRoot })
     if (!co.ok) return fail(`checkout ${repoBranch} failed:\n${co.stderr.trim().slice(-4000)}`)
 
-    const pulled = await run('git', ['merge', '--ff-only', `origin/${repoBranch}`], { cwd: repoRoot })
+    let pulled = await run('git', ['merge', '--ff-only', `origin/${repoBranch}`], { cwd: repoRoot })
+
+    // A deployed box always has a modified package-lock.json: npm rewrites it
+    // on install, and on a platform the maintainer's lockfile did not cover it
+    // gets regenerated wholesale. That local copy is *correct for this machine*,
+    // so it is kept until it actually blocks an update — then it is discarded
+    // and the dependencies step rebuilds it. Any other local change still stops
+    // the update: that one is a human's edit, not a tool's.
+    if (!pulled.ok && pulled.stderr.includes('package-lock.json')) {
+      ctx.log('the generated package-lock.json blocks the update — discarding it…')
+      await run('git', ['checkout', '--', 'package-lock.json'], { cwd: repoRoot })
+      pulled = await run('git', ['merge', '--ff-only', `origin/${repoBranch}`], { cwd: repoRoot })
+    }
     if (!pulled.ok) {
       return fail(`not a fast-forward — resolve by hand on the box:\n${pulled.stderr.trim().slice(-4000)}`)
     }
@@ -344,19 +352,60 @@ const dependencies: DeployStep = {
     if (!existsSync(marker)) return todo('node_modules missing or incomplete')
     const sqlite = join(ctx.cfg.repoRoot, 'node_modules/better-sqlite3')
     if (!existsSync(sqlite)) return todo('better-sqlite3 not installed — the core cannot open its database')
+    // Present-but-unusable is the interesting case: a lockfile from another
+    // platform installs a tree that looks complete and has no native binaries.
+    const probe = await run(process.execPath, ['-e', "require('rollup/dist/native.js')"], {
+      cwd: ctx.cfg.repoRoot,
+    })
+    if (!probe.ok) {
+      return todo('native modules missing for this platform — the frontend build would fail', [
+        'the lockfile was generated elsewhere; applying this step reinstalls without it',
+      ])
+    }
     return ok('installed', [`tsx at ${marker}`])
   },
   async apply(ctx) {
+    const { repoRoot } = ctx.cfg
     ctx.log('npm install (this takes a few minutes on a fresh box)…')
     // `install`, not `ci`: the workspace ships no committed lockfile guarantee
     // across the two repo cut points, and `ci` deletes node_modules on every
     // re-run of the wizard for no gain.
     const res = await run('npm', ['install', '--no-audit', '--no-fund'], {
-      cwd: ctx.cfg.repoRoot,
+      cwd: repoRoot,
       timeoutMs: 1_800_000,
     })
     if (!res.ok) return fail(`npm install failed:\n${res.stderr.trim().slice(-4000)}`)
-    return ok('dependencies installed')
+
+    // A lockfile generated on the maintainer's machine records only that
+    // machine's platform-specific optional packages. Installing it on a
+    // different OS or architecture silently omits the native binaries rollup,
+    // esbuild and sharp need, and the failure surfaces much later as a build
+    // that cannot load a module (npm/cli#4828). Probe for it here, where the
+    // fix is obvious, rather than letting the build step report someone else's
+    // bug. Rollup is the probe because it is the one the frontend build hits
+    // first.
+    const probe = await run(process.execPath, ['-e', "require('rollup/dist/native.js')"], {
+      cwd: repoRoot,
+    })
+    if (probe.ok) return ok('dependencies installed')
+
+    ctx.log('lockfile is from another platform — reinstalling without it…')
+    await run('rm', ['-rf', join(repoRoot, 'node_modules'), join(repoRoot, 'package-lock.json')], {
+      timeoutMs: 300_000,
+    })
+    const retry = await run('npm', ['install', '--no-audit', '--no-fund'], {
+      cwd: repoRoot,
+      timeoutMs: 1_800_000,
+    })
+    if (!retry.ok) return fail(`npm install failed:\n${retry.stderr.trim().slice(-4000)}`)
+
+    const reprobe = await run(process.execPath, ['-e', "require('rollup/dist/native.js')"], {
+      cwd: repoRoot,
+    })
+    if (!reprobe.ok) {
+      return fail(`native modules still missing after a clean install:\n${reprobe.stderr.trim().slice(-2000)}`)
+    }
+    return ok('dependencies installed (lockfile regenerated for this platform)')
   },
 }
 
