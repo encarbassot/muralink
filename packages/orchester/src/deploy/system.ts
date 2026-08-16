@@ -11,7 +11,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:net'
 import { resolve4 } from 'node:dns/promises'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 export interface RunResult {
   ok: boolean
@@ -83,6 +83,18 @@ export function writePrivileged(path: string, content: string, mode?: string): P
     if (!res.ok || !mode) return res
     return runPrivileged('chmod', [mode, path])
   })
+}
+
+// Does this file exist, asked with root's eyes?
+//
+// Needed because the wizard runs unprivileged while some of the paths it
+// reasons about are root-only — /etc/letsencrypt/live is drwx------, so a plain
+// `existsSync` answers "no" for a certificate that is plainly there. Believing
+// that answer is not a cosmetic bug: a step that concludes "no cert" renders
+// the plain-HTTP site and silently downgrades a working HTTPS instance.
+export async function existsPrivileged(path: string): Promise<boolean> {
+  if (existsSync(path)) return true
+  return (await runPrivileged('test', ['-f', path])).ok
 }
 
 // Absolute path of a binary, or null. Synchronous: callers use it inside

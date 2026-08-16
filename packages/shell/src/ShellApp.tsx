@@ -106,6 +106,9 @@ export function ShellApp({
     }
   })
 
+  // Lives in the dock's lower section, next to the platform's account entry
+  // (which platforms contribute as a `bottom` slot) — settings and identity
+  // sit together at the foot of the dock, away from the pinned cells.
   const configButton = {
     type: 'button' as const,
     id: '__grid-config',
@@ -113,9 +116,12 @@ export function ShellApp({
     label: 'Grid settings',
     onClick: () => setShowConfig((v) => !v),
     active: showConfig,
+    bottom: true,
   }
 
-  const allDockItems = [...dockItems, configButton]
+  // configButton first so it renders above any platform-supplied bottom entry
+  // (the account avatar stays the last thing in the dock).
+  const allDockItems = [configButton, ...dockItems]
 
   return (
     <AppShell

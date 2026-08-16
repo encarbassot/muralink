@@ -17,8 +17,8 @@ import { existsSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  dnsA, freeBytes, hostInfo, installCmd, portFree, portHolder, publicIp,
-  run, runPrivileged, which,
+  dnsA, existsPrivileged, freeBytes, hostInfo, installCmd, portFree, portHolder,
+  publicIp, run, runPrivileged, which,
 } from './system'
 import { randomBytes } from 'node:crypto'
 import { ACME_WEBROOT, applySite, nginxStatus, renderSite } from './nginx'
@@ -645,11 +645,15 @@ const database: DeployStep = {
 // The site nginx should be serving, given the config as it stands right now.
 // Shared by check and apply so the two can never disagree about what "applied"
 // means — the check renders this and diffs it against the file on disk.
-function siteConfigFor(cfg: DeployConfig): Parameters<typeof applySite>[0] {
+async function siteConfigFor(cfg: DeployConfig): Promise<Parameters<typeof applySite>[0]> {
   // Certificates are issued in the next step and HTTP-01 needs :80 answering,
   // so the site starts in plain-HTTP mode. The tls step promotes it.
   const certs = cfg.tls === 'acme' ? acmePaths(cfg.domain) : selfSignedPaths(cfg.domain)
-  const haveCert = existsSync(certs.certPath) && existsSync(certs.keyPath)
+  // existsPrivileged, never existsSync: certbot's live/ directory is root-only
+  // and this process is not root. A plain existsSync reports "no certificate"
+  // for one that exists, this renders the plain-HTTP site, and applying it
+  // takes TLS off an instance that was serving HTTPS perfectly well.
+  const haveCert = (await existsPrivileged(certs.certPath)) && (await existsPrivileged(certs.keyPath))
   return {
     domain: cfg.domain,
     aliases: cfg.aliases,
@@ -685,7 +689,7 @@ const webserver: DeployStep = {
     // config says otherwise — and `apply --all` would skip this step forever
     // because "the site is enabled" was the whole test.
     const deployed = await runPrivileged('cat', [st.sitePath])
-    if (deployed.ok && deployed.stdout.trim() !== renderSite(siteConfigFor(cfg)).trim()) {
+    if (deployed.ok && deployed.stdout.trim() !== renderSite(await siteConfigFor(cfg)).trim()) {
       return todo('the deployed site differs from what this config renders', hints)
     }
 
@@ -702,7 +706,7 @@ const webserver: DeployStep = {
       return fail('the login gate has no password yet — apply the service step with MURALINK_AUTH_PASSWORD set')
     }
 
-    const site = siteConfigFor(cfg)
+    const site = await siteConfigFor(cfg)
     ctx.log(`applying site in ${site.mode} mode…`)
     const res = await applySite(site)
     if (!res.ok) return fail(res.message)
@@ -775,7 +779,7 @@ const tls: DeployStep = {
       // Same builder the webserver step uses, forced to https now that the
       // certificate exists. Rendering it any other way here would leave the
       // webserver check reporting drift against a site this step just wrote.
-      const site = await applySite({ ...siteConfigFor(cfg), mode: 'https', certPath: paths.certPath, keyPath: paths.keyPath })
+      const site = await applySite({ ...(await siteConfigFor(cfg)), mode: 'https', certPath: paths.certPath, keyPath: paths.keyPath })
       if (!site.ok) return fail(site.message)
     }
     return ok('TLS in place')
@@ -800,9 +804,17 @@ const verify: DeployStep = {
 
     // Sign in the way a browser does — post the form, keep the cookie — so this
     // exercises the real gate rather than a side door kept open for testing.
+    // A gate with no password to hand is not a failure, it is a check we cannot
+    // run: every authenticated assertion below would see the login redirect and
+    // report a healthy instance as broken. `status` is normally invoked without
+    // the password, so treating this as a failure would paint this step red
+    // forever and send the operator chasing a problem that does not exist.
+    const gated = Boolean(cfg.basicAuthUser)
+    const canSignIn = gated && Boolean(ctx.secrets.basicAuthPassword)
+
     const jar = join(tmpdir(), `muralink-verify-${process.pid}.cookies`)
     const auth: string[] = []
-    if (cfg.basicAuthUser && ctx.secrets.basicAuthPassword) {
+    if (canSignIn) {
       const login = await run('curl', [
         ...insecure, '-sS', '-o', '/dev/null', '-w', '%{http_code}',
         '-c', jar,
@@ -819,19 +831,22 @@ const verify: DeployStep = {
       else auth.push('-b', jar)
     }
 
-    const front = await run('curl', [...insecure, ...auth, '-sS', '-o', '/dev/null', '-w', '%{http_code}', base, '--max-time', '15'])
-    const frontCode = front.stdout.trim()
-    hints.push(`GET /            → ${frontCode || front.stderr.trim()}`)
-    if (frontCode !== '200') problems.push(`frontend returned ${frontCode || 'nothing'}`)
+    // Only meaningful with a session in hand (or no gate at all) — see above.
+    if (!gated || canSignIn) {
+      const front = await run('curl', [...insecure, ...auth, '-sS', '-o', '/dev/null', '-w', '%{http_code}', base, '--max-time', '15'])
+      const frontCode = front.stdout.trim()
+      hints.push(`GET /            → ${frontCode || front.stderr.trim()}`)
+      if (frontCode !== '200') problems.push(`frontend returned ${frontCode || 'nothing'}`)
 
-    // Through the proxy: this is what proves nginx is injecting the bearer
-    // token — the browser sends none and the core still answers.
-    const api = await run('curl', [...insecure, ...auth, '-sS', '-w', '\n%{http_code}', `${base}/api/storage/root`, '--max-time', '15'])
-    const apiLines = api.stdout.trim().split('\n')
-    const apiCode = apiLines[apiLines.length - 1]
-    hints.push(`GET /api/storage/root → ${apiCode}: ${apiLines.slice(0, -1).join(' ').slice(0, 120)}`)
-    if (apiCode === '401') problems.push('the core rejected the proxied token — nginx and the env file disagree on ELIO_API_TOKEN')
-    else if (apiCode !== '200') problems.push(`storage API returned ${apiCode}`)
+      // Through the proxy: this is what proves nginx is injecting the bearer
+      // token — the browser sends none and the core still answers.
+      const api = await run('curl', [...insecure, ...auth, '-sS', '-w', '\n%{http_code}', `${base}/api/storage/root`, '--max-time', '15'])
+      const apiLines = api.stdout.trim().split('\n')
+      const apiCode = apiLines[apiLines.length - 1]
+      hints.push(`GET /api/storage/root → ${apiCode}: ${apiLines.slice(0, -1).join(' ').slice(0, 120)}`)
+      if (apiCode === '401') problems.push('the core rejected the proxied token — nginx and the env file disagree on ELIO_API_TOKEN')
+      else if (apiCode !== '200') problems.push(`storage API returned ${apiCode}`)
+    }
 
     // Unauthenticated request must NOT get through when a gate is configured.
     // It is sent to the login page — a redirect, not a 401, because a 401 is
@@ -846,6 +861,12 @@ const verify: DeployStep = {
     if (existsSync(jar)) await run('rm', ['-f', jar])
 
     if (problems.length) return fail(problems.join('; '), hints)
+    if (gated && !canSignIn) {
+      return warn('gate enforcing; the signed-in path was not exercised', [
+        ...hints,
+        'set MURALINK_AUTH_PASSWORD to check what a logged-in browser sees',
+      ])
+    }
     return ok('the instance answers from the outside', hints)
   },
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { MarkdownEditor } from '@muralink/module-notes/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ShellApp, type CellContext, type ModuleDescriptor, type ModuleVariant, type CellMethod, type CellTab, type OnClickBinding, type GridLayoutHandle } from '@muralink/shell'
+import { ShellApp, type CellContext, type DockItem, type ModuleDescriptor, type ModuleVariant, type CellMethod, type CellTab, type OnClickBinding, type GridLayoutHandle } from '@muralink/shell'
 import type { GridCellPosition, GridCellRecord, GridSize, LayoutConstraints } from '@muralink/types'
 import { localStorageAdapter, makeCloudLayoutAdapter, makeVaultSync, sizeSpan, type CellMenuItem } from '@muralink/ui'
 import { setAmbientSpace, type SpaceId } from '@muralink/spaces'
@@ -183,8 +183,20 @@ function WebShell({ env }: { env: AppEnv }) {
     [setView, current.id],
   )
 
+  // Closes the pinned row with the same "add element" entry point the grid uses
+  // (empty-slot click / ⌘K): no slot means auto-placement decides the position.
+  const addButton: DockItem = {
+    type: 'button',
+    id: '__dock-add',
+    icon: <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>,
+    label: 'Añadir elemento',
+    onClick: () => setAddSlot({ col: 0, row: 0, context: { source: 'none' } }),
+    active: addSlot !== null,
+  }
+
   const dockItems = [
     ...pinnedDockItems(layoutRef.current?.cells ?? [], registry, ctx, focusedCellId ?? undefined),
+    addButton,
     ...(env.dockItems ?? []),
   ]
 
